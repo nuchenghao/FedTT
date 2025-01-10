@@ -1,5 +1,5 @@
 #---------------------resnet50 cifar100 seed 16------------------------------------
-python3 -u ./centralized/resnet50_cifar100.py --config_path ./config/resnet50_cifar100/centralized.yaml
+python3 -u ./centralized/resnet50_cifar100.py --config_path ./resnet50_cifar100/dir_5_seed_16_client_30/centralized.yaml
 # python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/data.yaml
 # python3 -u ./server/fedavg.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedavg.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/classify_dynamic_batch5.yaml
