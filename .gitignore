@@ -1,0 +1,3 @@
+*.pyc
+WANDB_LOG_DIR/
+trainlog/
