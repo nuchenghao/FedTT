@@ -1,3 +1,5 @@
 *.pyc
 WANDB_LOG_DIR/
 trainlog/
+data/cifar100
+data/cinic10
