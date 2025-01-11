@@ -45,14 +45,15 @@ class myFed(FedAvgTrainer):
 
     def full_set(self):
         self.model.train()
-        for inputs, targets in self.trainloader:
-            inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,
-                                                                                    non_blocking=True)
-            self.optimizer.zero_grad()
-            outputs = self.model(inputs)
-            loss = self.criterion(outputs, targets).mean()
-            loss.backward()
-            self.optimizer.step()
+        for _ in range(self.local_epoch):
+            for inputs, targets in self.trainloader:
+                inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,
+                                                                                        non_blocking=True)
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets).mean()
+                loss.backward()
+                self.optimizer.step()
         torch.cuda.synchronize()
 
     def train(self):
