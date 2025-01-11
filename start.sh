@@ -9,3 +9,8 @@ python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16
 python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_fixed_batch_global_loss3.yaml
 python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_fixed_batch_global_loss2.yaml
 python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_fixed_batch_global_loss1.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss5.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss4.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss3.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss2.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss1.yaml
