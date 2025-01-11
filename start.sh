@@ -14,3 +14,8 @@ python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16
 python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss3.yaml
 python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss2.yaml
 python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss1.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/classify_dynamic_batch1.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/classify_dynamic_batch2.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/classify_dynamic_batch3.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/classify_dynamic_batch4.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/classify_dynamic_batch5.yaml
