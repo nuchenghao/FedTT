@@ -283,7 +283,7 @@ class myFed(FedAvgTrainer):
                     cnt ^= 1
                     self.barrier.wait()
             new_batch_size = int(
-                (((self.args["batch_size"] / (1 + (self.r - 1) * (total_correct / total_dataset))) // 32)) * 32)
+                (((self.args["batch_size"] / (1 + (self.r - 1) * (total_correct / total_dataset))) // 32)+1) * 32)
             self.trainloader.batch_sampler.batch_size = new_batch_size
             self.finish_one_epoch.wait()
             self.finish_one_epoch.clear()
