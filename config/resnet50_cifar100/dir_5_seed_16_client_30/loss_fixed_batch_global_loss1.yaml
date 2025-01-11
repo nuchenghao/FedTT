@@ -28,4 +28,4 @@ experiment_name: "loss_fixed_batch_global_loss_1"
 
 # 我的方法超参数
 r: 0.1
-start: 0.1
+start: 0.2
