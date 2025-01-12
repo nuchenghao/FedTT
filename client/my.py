@@ -154,6 +154,7 @@ class myFed(FedAvgTrainer):
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
+            torch.cuda.reset_peak_memory_stats() # 重置显存峰值统计
             gpu_utilization = []
             total_correct = 0
             itertrainloader = iter(self.trainloader)  # 创建trainloader的迭代器
@@ -206,8 +207,8 @@ class myFed(FedAvgTrainer):
                     cnt ^= 1
                     self.barrier.wait()
             global_loss_threshold = loss_global.mean()
-            if sum(gpu_utilization) / len(gpu_utilization) < 98.0 and (torch.cuda.max_memory_reserved() < int(self.max_gpu_memory_GB * (1024 ** 3))):
-                self.trainloader.batch_sampler.batch_size = self.trainloader.batch_sampler.batch_size + 8
+            # if sum(gpu_utilization) / len(gpu_utilization) < 95.0 and (torch.cuda.max_memory_reserved() < int(self.max_gpu_memory_GB * (1024 ** 3))):
+            #     self.trainloader.batch_sampler.batch_size = self.trainloader.batch_sampler.batch_size + 16
         self.inference_to_train.put(0)
         train_thread.join()
         self.current_client.loss = global_loss_threshold.item()
@@ -284,6 +285,7 @@ class myFed(FedAvgTrainer):
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
+            torch.cuda.reset_peak_memory_stats() # 重置显存峰值统计
             gpu_utilization = []
             itertrainloader = iter(self.trainloader)  # 创建trainloader的迭代器
             self.inference_to_train.put(len(itertrainloader))  # 训练线程预加载,这里的值时batch_size会load的次数
@@ -333,14 +335,13 @@ class myFed(FedAvgTrainer):
                     self.inference_event.record()
                     self.barrier.wait()
                     cnt ^= 1
-            if sum(gpu_utilization) / len(gpu_utilization) < 98.0 and (torch.cuda.max_memory_reserved() < int(self.max_gpu_memory_GB * (1024 ** 3))):
-                self.trainloader.batch_sampler.batch_size = self.trainloader.batch_sampler.batch_size + 8 
+            # if sum(gpu_utilization) / len(gpu_utilization) < 95.0 and (torch.cuda.max_memory_reserved() < int(self.max_gpu_memory_GB * (1024 ** 3))):
+            #     self.trainloader.batch_sampler.batch_size = self.trainloader.batch_sampler.batch_size + 8 
         torch.cuda.synchronize()
         self.inference_to_train.put(0)
         train_thread.join()
 
     def local_train(self):
-        torch.cuda.reset_peak_memory_stats() # 重置显存峰值统计
         if self.synchronization['prune'] and self.current_client.participation_times > 0:
             self.func[self.args["algorithm"]]()
             self.current_client.batch_size = self.trainloader.batch_sampler.batch_size  # 记录当前client的batch——size
