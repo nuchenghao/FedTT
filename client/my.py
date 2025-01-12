@@ -281,8 +281,7 @@ class myFed(FedAvgTrainer):
                     self.inference_event.record()
                     cnt ^= 1
                     self.barrier.wait()
-            new_batch_size = int(
-                (((self.args["batch_size"] / (1 + (self.r - 1) * (total_correct / total_dataset))) // 32)) * 32)
+            new_batch_size = min(int((((self.args["batch_size"] / (1 + (self.r - 1) * (total_correct / total_dataset))) // 32)) * 32) , 256)
             self.trainloader.batch_sampler.batch_size = new_batch_size
             # self.finish_one_epoch.wait()
             # self.finish_one_epoch.clear()
