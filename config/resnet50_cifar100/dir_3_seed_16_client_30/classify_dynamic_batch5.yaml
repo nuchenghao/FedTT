@@ -22,7 +22,7 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "resnet50_cifar100_16_dir_5"
+project: "resnet50_cifar100_16_dir_3"
 experiment_name: "classify_dynamic_batch_5"
 
 
