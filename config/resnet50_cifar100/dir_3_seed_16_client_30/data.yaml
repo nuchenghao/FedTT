@@ -1,0 +1,6 @@
+dataset: cifar100 #cinic10、
+seed: 16 # 注意与全局seed保持一致
+client_num: 30 #客户端数量
+iid: 0 #是否是iid划分，0为iid、非0为non-iid
+alpha: 0.3 # 如果iid为0，alpha指定Dir(alpha)
+least_samples: 100 #Dir(alpha)中每个client至少有多少个样本。这个值目前有些问题

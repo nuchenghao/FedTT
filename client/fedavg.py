@@ -25,7 +25,7 @@ with open(PROJECT_DIR / "utls" / "network_distribution.json", 'r') as f:
     network_distribution = json.load(f)
 
 
-class Client:
+class BaseClient:
     def __init__(self, client_id, train_index, batch_size):
         self.client_id = client_id
         self.train_set_index = train_index
@@ -113,12 +113,11 @@ class FedAvgTrainer:
               optimizer_state_dict: OrderedDict[str, torch.Tensor],
               trainer_synchronization
               ):
-        self.current_client = client
-        self.load_dataset()
-        self.set_parameters(optimizer_state_dict, trainer_synchronization)  # 设置参数
         self.timer.start()
+        self.current_client = client
+        self.set_parameters(optimizer_state_dict, trainer_synchronization)  # 设置参数
+        self.load_dataset()
         self.local_train()
-        self.timer.stop()
 
         if self.args['client_eval']:
             self.current_client.accuracy = evaluate(self.device, self.model, self.testloader)
@@ -126,6 +125,7 @@ class FedAvgTrainer:
             self.current_client.accuracy = 0.0
         self.model = self.model.to("cpu")  # 训练&验证 结束后将模型转移到cpu上
         self.current_client.model_dict = deepcopy(self.model.state_dict())  # 一定要深拷贝
+        self.timer.stop() # 里面的一些操作带来的开销就权当是网络传输的时间了
         self.current_client.training_time = self.timer.times[-1]
         self.current_client.participate_once()
         torch.cuda.empty_cache() # 释放缓存 

@@ -27,7 +27,7 @@ from utls.utils import (
     get_argparser,
     evaluate
 )
-from client.fedavg import FedAvgTrainer, Client
+from client.fedavg import FedAvgTrainer, BaseClient
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS
 from utls.dataset import CustomSampler
@@ -39,6 +39,7 @@ class FedAvgServer:
             self,
             args: dict = None,
             trainer_type=FedAvgTrainer,
+            client_type=BaseClient
     ):
         self.args = args  # 配置文件
         self.algorithm = args["algorithm"]
@@ -135,9 +136,9 @@ class FedAvgServer:
         # TODO ----------------- init client-----------------------
         data_indices = partition["data_indices"]  # 整个的训练集划分,data_indices的类型为list[np.array]
 
-        self.client_instances: list[Client] = []
+        self.client_instances: list[BaseClient] = []
         for client_id in self.train_client_ids:
-            self.client_instances.append(Client(client_id, data_indices[client_id].tolist(), self.args["batch_size"], ))
+            self.client_instances.append(client_type(client_id, data_indices[client_id].tolist(), self.args["batch_size"], ))
 
         # 这里的model需要深拷贝
         self.cuda_0_trainer = trainer_type(self.device, deepcopy(self.model), self.trainloader, self.testloader,

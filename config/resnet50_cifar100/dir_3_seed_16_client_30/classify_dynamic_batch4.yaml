@@ -4,7 +4,7 @@ dataset: cifar100 #cinic10、
 
 
 set_seed: True # True为设置种子，False为性能测试
-seed: 16666 # 注意修改data中的seed;
+seed: 16 # 注意修改data中的seed;
 
 client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
@@ -21,12 +21,12 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
-wandb: 0
-project: "resnet50_cifar100_16666_dir_5"
-experiment_name: "classify_dynamic_batch_5"
+wandb: 1
+project: "resnet50_cifar100_16_dir_5"
+experiment_name: "classify_dynamic_batch_4"
 
 
 # 我的方法超参数
-r: 0.5
+r: 0.4
 start: 0.2
 max_gpu_memory_GB: 22
