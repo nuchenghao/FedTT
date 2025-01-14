@@ -41,7 +41,7 @@ class fedsampling(FedAvgServer):
         self.K = int(N_hat * self.args['KN'])  # 占整体比例，这里就按照整体比例去算了
 
         trainer_synchronization = {'KN': self.args['KN'] , "K" : self.K}
-        print(f"K:{self.K} N_hat{N_hat}")
+        print(f"K:{self.K} N_hat:{N_hat}")
         for client_id in self.current_selected_client_ids:
             self.client_instances[client_id].model_dict = self.model.state_dict()
         for client_id in self.current_selected_client_ids:
