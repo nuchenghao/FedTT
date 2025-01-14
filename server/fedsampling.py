@@ -6,7 +6,7 @@ from fedavg import FedAvgServer
 from utls.utils import get_argparser, fix_random_seed
 from client.fedsampling import fedsamplingClient,fedsamplingTrainer
 from rich.console import Console
-import os
+import torch
 
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1' # debug
 
@@ -17,23 +17,29 @@ sys.path.append(PROJECT_DIR.joinpath("src").as_posix())
 class fedsampling(FedAvgServer):
     def __init__(self, args, trainer_type=fedsamplingTrainer, client_type=fedsamplingClient):
         super().__init__(args, trainer_type, client_type)
+
+        self.alpha = 0.5
+        self.M = max(len(client_data_indices) for client_data_indices in self.data_indices)
+        for client_instance in self.client_instances:
+            assert type(client_instance) == fedsamplingClient
+            client_instance.set_estimator(self.M + 1) # 设置为最大值+1，因为fake无法取到上界
     
     def train_one_round(self):
-        client_model_cache = []  # 缓存梯度
-        weight_cache = []  # 缓存梯度对应的权重
+        client_grad = []
+        client_buffer = []
         client_training_time = []
         response = []
-        for client_instance in self.client_instances:
-            response.append(client_instance.estimator.query())
-        R = sum(response)
-        hat_n = (R - len(self.train_users)*(1-self.alpha)*self.M/2)/self.alpha
-            
 
-        trainer_synchronization = {'KN': False}
-        if self.current_global_epoch >= self.need_to_keep:
-            trainer_synchronization['prune'] = True
         for client_id in self.current_selected_client_ids:
-            assert self.client_instances[client_id].client_id == client_id
+             response.append(self.client_instances[client_id].estimator.query())
+
+        R = sum(response)
+        N_hat = (R - len(self.current_selected_client_ids) * (1 - self.alpha) * self.M / 2) / self.alpha
+        self.K = int(N_hat * self.args['KN'])  # 占整体比例，这里就按照整体比例去算了
+
+        trainer_synchronization = {'KN': self.args['KN'] , "K" : self.K}
+        print(f"K:{self.K} N_hat{N_hat}")
+        for client_id in self.current_selected_client_ids:
             self.client_instances[client_id].model_dict = self.model.state_dict()
         for client_id in self.current_selected_client_ids:
             modified_client_instance = self.cuda_0_trainer.start(
@@ -43,22 +49,36 @@ class fedsampling(FedAvgServer):
             )
             assert modified_client_instance.client_id == client_id
             self.logger.log(
-                f"client {client_id} has finished and has participate {modified_client_instance.participation_times}. The local train set size is {modified_client_instance.train_set_len}",
-                f"The local accuracy is {modified_client_instance.accuracy:.3f}%.",
-                f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}")
+                f"client {client_id} has finished and has participate {modified_client_instance.participation_times}. The local train set size is {modified_client_instance.train_set_len} and used {modified_client_instance.selected_data_num}.",
+                f"The pretrained acc is {modified_client_instance.pretrained_accuracy:.3f}%.The local accuracy is {modified_client_instance.accuracy:.3f}%.",
+                f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}.")
             self.client_to_server.put(modified_client_instance)
         assert self.client_to_server.qsize() == len(self.current_selected_client_ids)
         while not self.client_to_server.empty():
             modified_client_instance = self.client_to_server.get()
             assert modified_client_instance.client_id in self.current_selected_client_ids
-            client_model = {key: value.to(self.device) for key, value in modified_client_instance.model_dict.items()}
-            client_model_cache.append(client_model)
-            weight_cache.append(modified_client_instance.train_set_len)
+            client_grad.append(modified_client_instance.grad) # 每个元素都是一个dict
+            client_buffer.append(modified_client_instance.buffer) # 每个元素都是一个dict
             client_training_time.append(round(modified_client_instance.training_time * 10.0))
             self.client_instances[modified_client_instance.client_id] = modified_client_instance  # 更新client信息
         # 聚合并更新参数
-        self.aggregate(client_model_cache, weight_cache)  # 聚合梯度
-        self.current_global_epoch += 1
+        self.optimizer.zero_grad()
+        for name , param in self.model.named_parameters():
+            cache = []
+            for grad in client_grad:
+                cache.append(grad[name])
+            agg_grad = (1 / self.K) * torch.sum(torch.stack(cache , dim=-1) , dim=-1)
+            param.grad = agg_grad
+        for name , param in self.model.named_buffers():
+            cache = []
+            for buffer in client_buffer:
+                cache.append(buffer[name])
+            if "num_batches_tracked" not in name:
+                agg_buffer = torch.mean(torch.stack(cache , dim=-1) , dim=-1)
+            else :# num_batches_tracked这个参数不重要
+                agg_buffer = torch.sum(torch.stack(cache,dim=-1),dim=-1)
+            param.data = agg_buffer
+        self.optimizer.step() # 更新
         return max(client_training_time)
 
 

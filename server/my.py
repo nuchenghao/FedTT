@@ -40,9 +40,9 @@ class myFedServer(FedAvgServer):
             )
             assert modified_client_instance.client_id == client_id
             self.logger.log(
-                f"client {client_id} has finished and has participate {modified_client_instance.participation_times}. The local train set size is {modified_client_instance.train_set_len}",
-                f"The local accuracy is {modified_client_instance.accuracy:.3f}%.",
-                f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}")
+                f"client {client_id} has finished and has participate {modified_client_instance.participation_times}. The local train set size is {modified_client_instance.train_set_len}. ",
+                f"The pretrained acc is {modified_client_instance.pretrained_accuracy:.3f}%.The local accuracy is {modified_client_instance.accuracy:.3f}%.",
+                f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}.")
             self.client_to_server.put(modified_client_instance)
         assert self.client_to_server.qsize() == len(self.current_selected_client_ids)
         while not self.client_to_server.empty():

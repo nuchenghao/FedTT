@@ -42,8 +42,11 @@ class BaseClient:
 
         self.model_dict = None  # 存当前的全局模型状态
         self.training_time = 0
+        self.pretrained_accuracy = 0
         self.accuracy = 0
         self.loss = 0.0
+        self.grad = None #存梯度值
+        self.buffer = None # 存persistent_buffers
 
     def participate_once(self):
         self.participation_times += 1
@@ -117,7 +120,13 @@ class FedAvgTrainer:
         self.current_client = client
         self.set_parameters(optimizer_state_dict, trainer_synchronization)  # 设置参数
         self.load_dataset()
-        self.local_train()
+
+        if self.args['client_eval']:
+            self.current_client.pretrained_accuracy = evaluate(self.device, self.model, self.testloader)
+        else:
+            self.current_client.pretrained_accuracy = 0.0
+
+        self.local_train() # 本地训练
 
         if self.args['client_eval']:
             self.current_client.accuracy = evaluate(self.device, self.model, self.testloader)
@@ -135,8 +144,7 @@ class FedAvgTrainer:
         self.model.train()
         for _ in range(self.local_epoch):
             for inputs, targets in self.trainloader:
-                inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,
-                                                                                        non_blocking=True)
+                inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, targets)

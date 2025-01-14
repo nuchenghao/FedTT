@@ -134,11 +134,11 @@ class FedAvgServer:
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.args["lr"],
                                          momentum=self.args["momentum"], weight_decay=self.args["weight_decay"])
         # TODO ----------------- init client-----------------------
-        data_indices = partition["data_indices"]  # 整个的训练集划分,data_indices的类型为list[np.array]
+        self.data_indices = partition["data_indices"]  # 整个的训练集划分,data_indices的类型为list[np.array]
 
         self.client_instances: list[BaseClient] = []
         for client_id in self.train_client_ids:
-            self.client_instances.append(client_type(client_id, data_indices[client_id].tolist(), self.args["batch_size"], ))
+            self.client_instances.append(client_type(client_id, self.data_indices[client_id].tolist(), self.args["batch_size"], ))
 
         # 这里的model需要深拷贝
         self.cuda_0_trainer = trainer_type(self.device, deepcopy(self.model), self.trainloader, self.testloader,
@@ -156,8 +156,9 @@ class FedAvgServer:
             self.model = self.model.to(self.device)
             accuracy = evaluate(torch.device("cuda:0"), self.model, self.testloader)
             self.model = self.model.to('cpu')
-            self.logger.log(f"Finished training!!! training time: {training_time}.",
-                                f"The Global model accuracy is {accuracy:.3f}%.")
+            self.logger.log(f"Finished training!!! Current global epoch training time: {training_time}.",
+                            f"The global time is {self.current_time}",
+                            f"The Global model accuracy is {accuracy:.3f}%.")
             if self.args["wandb"]:
                 self.experiment.log({"acc": accuracy}, step=self.current_time)
 
@@ -177,9 +178,9 @@ class FedAvgServer:
             )
             assert modified_client_instance.client_id == client_id
             self.logger.log(
-                f"client {client_id} has finished and has participate {modified_client_instance.participation_times}. The local train set size is {modified_client_instance.train_set_len}",
-                f"The local accuracy is {modified_client_instance.accuracy:.3f}%.",
-                f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}")
+                f"client {client_id} has finished and has participate {modified_client_instance.participation_times}. The local train set size is {modified_client_instance.train_set_len}. ",
+                f"The pretrained acc is {modified_client_instance.pretrained_accuracy:.3f}%. The local accuracy is {modified_client_instance.accuracy:.3f}%.",
+                f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}.")
             self.client_to_server.put(modified_client_instance)
         assert self.client_to_server.qsize() == len(self.current_selected_client_ids)
         while not self.client_to_server.empty():
