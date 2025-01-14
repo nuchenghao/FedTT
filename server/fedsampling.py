@@ -30,11 +30,14 @@ class fedsampling(FedAvgServer):
         client_training_time = []
         response = []
 
+        N_hat=0
         for client_id in self.current_selected_client_ids:
-             response.append(self.client_instances[client_id].estimator.query())
+            # response.append(self.client_instances[client_id].estimator.query())
+            N_hat += len(self.data_indices[client_id])
 
-        R = sum(response)
-        N_hat = (R - len(self.current_selected_client_ids) * (1 - self.alpha) * self.M / 2) / self.alpha
+
+        # R = sum(response)
+        # N_hat = (R - len(self.current_selected_client_ids) * (1 - self.alpha) * self.M / 2) / self.alpha
         self.K = int(N_hat * self.args['KN'])  # 占整体比例，这里就按照整体比例去算了
 
         trainer_synchronization = {'KN': self.args['KN'] , "K" : self.K}
