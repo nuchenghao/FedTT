@@ -71,17 +71,14 @@ class fedsampling(FedAvgServer):
             for grad in client_grad:
                 cache.append(grad[name])
             agg_grad = (1 / self.K) * torch.sum(torch.stack(cache , dim=-1) , dim=-1)
-            param.grad = agg_grad
+            param.data -= agg_grad
         for name , param in self.model.named_buffers():
             cache = []
             for buffer in client_buffer:
                 cache.append(buffer[name])
-            if "num_batches_tracked" not in name:
-                agg_buffer = torch.mean(torch.stack(cache , dim=-1) , dim=-1)
-            else :# num_batches_tracked这个参数不重要
-                agg_buffer = torch.sum(torch.stack(cache,dim=-1),dim=-1)
+            agg_buffer =(1 / self.K) * torch.sum(torch.stack(cache,dim=-1) , dim=-1)
             param.data = agg_buffer
-        self.optimizer.step() # 更新
+        
         return max(client_training_time)
 
 

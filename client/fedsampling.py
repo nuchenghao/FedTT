@@ -34,26 +34,13 @@ class fedsamplingClient(BaseClient):
 class fedsamplingTrainer(FedAvgTrainer):
     def __init__(self, device, model, trainloader, testloader, args):
         super().__init__(device, model, trainloader, testloader, args)  
-        # 修改评判器
-        self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
         self.selected_data_num = 0
     
-    def full_set(self):
-        self.model.train()
-        for _ in range(self.local_epoch):
-            self.optimizer.zero_grad()
-            for inputs, targets in self.trainloader:
-                inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets).sum()
-                loss.backward()
-        torch.cuda.synchronize()
-
     def load_dataset(self):
         # 对于每个 candidate_sample，生成一个独立的随机结果，表示在一次试验中成功的概率为 KN
         choosed = np.random.binomial(size=(self.current_client.train_set_len,), n=1, p=self.synchronization['KN'])
         candidate_set_index=np.array(self.current_client.train_set_index)
-        participate_set_index=candidate_set_index[choosed==1].tolist()
+        participate_set_index = candidate_set_index[choosed == 1].tolist()
         self.current_client.selected_data_num=len(participate_set_index)
         self.trainloader.sampler.set_index(participate_set_index)  # 在里面实现了深拷贝
         self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
@@ -82,11 +69,10 @@ class fedsamplingTrainer(FedAvgTrainer):
         self.model = self.model.to("cpu")  # 训练&验证 结束后将模型转移到cpu上
         delta = OrderedDict()
         for name , param in self.model.named_parameters():
-            if param.grad is not None:
-                delta[name] = deepcopy(param.grad)
+            delta[name] = self.current_client.selected_data_num * (self.current_client.model_dict[name] - param.data)
         buffer = OrderedDict()
         for name , param in self.model.named_buffers():
-            buffer[name] = deepcopy(param)
+            buffer[name] = self.current_client.selected_data_num * deepcopy(param.data)
         self.timer.stop() # 里面的一些操作带来的开销就权当是网络传输的时间了
         self.current_client.training_time = self.timer.times[-1]
         self.current_client.participate_once()

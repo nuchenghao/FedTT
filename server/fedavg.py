@@ -169,7 +169,7 @@ class FedAvgServer:
         trainer_synchronization = {}
         for client_id in self.current_selected_client_ids:
             assert self.client_instances[client_id].client_id == client_id
-            self.client_instances[client_id].model_dict = self.model.state_dict()
+            self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict())
         for client_id in self.current_selected_client_ids:
             modified_client_instance = self.cuda_0_trainer.start(
                 self.client_instances[client_id],
