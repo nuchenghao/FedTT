@@ -8,7 +8,7 @@ seed: 166 # 注意修改data中的seed;
 
 client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 150
+global_epoch: 300
 local_epoch: 4
 batch_size: 96 # Data batch size for client local training.
 client_eval: False
@@ -28,5 +28,5 @@ experiment_name: "classify_dynamic_batch_4"
 
 # 我的方法超参数
 r: 0.4
-start: 0.2
+start: 0.1
 max_gpu_memory_GB: 22

@@ -29,6 +29,7 @@
 # ------------------ seed 166 ---------------------------
 # python3 -u ./centralized/resnet50_cifar100.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/centralized.yaml
 python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/data.yaml
+python3 -u ./server/fedbalancer.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/fedbalancer.yaml
 # python3 -u ./server/fedavg.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/fedavg.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_fixed_batch5.yaml  
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_dynamic_batch5.yaml
@@ -37,16 +38,16 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/loss_dynamic_batch_global_loss5.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/loss_dynamic_batch_global_loss_wo_weights_5.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_fixed_batch4.yaml
-# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_dynamic_batch4.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_dynamic_batch4.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_dynamic_batch_wo_weights_4.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/loss_fixed_batch_global_loss4.yaml
-# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/loss_dynamic_batch_global_loss4.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/loss_dynamic_batch_global_loss4.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/loss_dynamic_batch_global_loss_wo_weights_4.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_fixed_batch3.yaml
-# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_dynamic_batch3.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_dynamic_batch3.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_dynamic_batch_wo_weights_3.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/loss_fixed_batch_global_loss3.yaml
-# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/loss_dynamic_batch_global_loss3.yaml
+python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/loss_dynamic_batch_global_loss3.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/loss_dynamic_batch_global_loss_wo_weights_3.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_fixed_batch2.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/classify_dynamic_batch2.yaml
@@ -64,10 +65,12 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 # python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/fedsampling_10.yaml
 # python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/fedsampling_9.yaml
 # python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/fedsampling_8.yaml
-python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/fedsampling_7.yaml
+# python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/fedsampling_7.yaml
 # python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/fedsampling_6.yaml
 # python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/fedsampling_5.yaml
 # python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/fedsampling_4.yaml
+
+
 
 
 
