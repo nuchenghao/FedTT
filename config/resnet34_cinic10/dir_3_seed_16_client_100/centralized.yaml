@@ -7,7 +7,7 @@ set_seed: True # True为设置种子，False为性能测试
 seed: 16 # 注意修改data中的seed;
 
 
-global_epoch: 120
+global_epoch: 50
 batch_size: 128 # Data batch size for client local training.
 
 lr: 0.01 # Learning rate for client local training.
