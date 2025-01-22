@@ -43,7 +43,7 @@ class fedbalancerTrainer(FedAvgTrainer):
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
     
     def load_dataset(self):
-        S = int(self.synchronization['deadline'] / self.local_epoch / self.current_client.batch_training_time * self.current_client.batch_size)
+        S = int(max(self.synchronization['deadline'] / self.local_epoch / self.current_client.batch_training_time,1.0) * self.current_client.batch_size)
         if self.current_client.participation_times == 0 or S >= self.current_client.train_set_len:
             self.trainloader.sampler.set_index(self.current_client.train_set_index)  # 在里面实现了深拷贝
             self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
@@ -57,7 +57,7 @@ class fedbalancerTrainer(FedAvgTrainer):
             over_threshold = self.current_client.train_set_index[loss_value >= self.synchronization['loss_threshold']]
             L = max(S,len(over_threshold))
             D_ = np.random.choice(over_threshold, size = min(int(L * self.p) , len(over_threshold)), replace=False) 
-            D__ = np.random.choice(under_threshold , size = min(max(0 , int(S - int(L * self.p))),len(under_threshold)) , replace = False)
+            D__ = np.random.choice(under_threshold , size = min(max(0 , L - len(D_)),len(under_threshold)) , replace = False)
             selected_index=np.concatenate((D_ , D__))
             self.trainloader.sampler.set_index(selected_index)  # 在里面实现了深拷贝
             self.trainloader.batch_sampler.batch_size = self.current_client.batch_size

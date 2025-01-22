@@ -105,7 +105,8 @@ class FedAvgServer:
         # TODO ------------init model(s) parameters-------
         torch.cuda.set_device("cuda:0")
         self.device = 'cuda:0'  # 全局模型的device默认为cuda:0
-        self.model = MODEL_DICT[self.args["model"]](DATA_NUM_CLASSES_DICT[self.args['dataset']])
+        self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
+        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes)
         # TODO ----------------------------- 数据加载器 --------------------------------
         self.dataset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
         self.testloader = DataLoader(Subset(self.dataset, list(range(len(self.dataset)))), batch_size=2048,
