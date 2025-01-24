@@ -27,3 +27,4 @@ project: "resnet34_cinic10_16_dir_3"
 experiment_name: "ODE"
 
 buffer_ratio: 0.8
+update_batch_size: 96

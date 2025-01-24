@@ -1,5 +1,5 @@
 import json
-import queue
+import torch
 import random
 import numpy as np
 from collections import OrderedDict
@@ -11,6 +11,7 @@ from sympy.stats.rv import probability
 from torch.utils.data import DataLoader, Subset
 import copy
 from collections import Counter
+from torch.func import grad, vmap
 
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 from utls.utils import NN_state_load, evaluate
@@ -42,8 +43,7 @@ class ODEClient(BaseClient):
 class ODETrainer(FedAvgTrainer):
     def __init__(self, device, model, trainloader, testloader, args):
         super().__init__(device, model, trainloader, testloader, args)
-        # 修改评判器
-        self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
+
 
     def get_client_grad(self , client_instance):
         self.current_client = client_instance
@@ -66,14 +66,48 @@ class ODETrainer(FedAvgTrainer):
             # 如果 inputs 是单个张量，返回值仍为元组，需通过索引 [0] 获取梯度。
             gradient_list.append(torch.autograd.grad(loss,trainable_parameters))
         sum_gradient = [torch.sum(torch.stack(grad,dim=-1),dim=-1) for grad in zip(*gradient_list)]
-        
+        self.model = self.model.to('cpu')
         return sum_gradient
 
-     
-    def update_client_buffer(self,client_instance):
-        for label in client_instance.distributed_labels.keys():
-            _buffer=queue.PriorityQueue()
-            while client_instance.buffer[label].qsize() != 0:
-                (value,index,index_in_dataset) = client_instance.buffer[label].get()
-                grad 
+    def loss_fn(self,params, data, target):
+        # 使用 `torch.func` 的函数式 API 调用模型
+        output = torch.func.functional_call(self.model, params, (data.unsqueeze(0),))
+        loss = self.criterion(output, target.unsqueeze(0))  # 计算损失
+        return loss  # 返回标量损失值
+
+    def update_client_buffer(self,client_instance,global_gradient,batch_size):
+        self.current_client = client_instance
+        self.model.load_state_dict(self.current_client.model_dict)
+        self.model = self.model.to(self.device)
+        self.model.train()
+        self.trainloader.sampler.set_index(self.current_client.train_set_index)
+        self.trainloader.batch_sampler.batch_size = batch_size
+        # 特殊层需要特殊处理----------
+        __NormBase = torch.nn.BatchNorm2d.__mro__[2] # <class 'torch.nn.modules.batchnorm._NormBase'> 
+        for module in self.model.modules():
+            if isinstance(module,__NormBase):
+                module.track_running_stats = False # 取消BN层的mean、var跟踪
+        params = dict(self.model.named_parameters())
+
+        
+        for inputs,targets in self.trainloader:
+            result=torch.zeros(len(targets),dtype=torch.float32,device=self.device)
+            inputs , targets = inputs.to(self.device, non_blocking=True) , targets.to(self.device, non_blocking=True)
+            gradients: dict[str:torch.tensor] = vmap(grad(self.loss_fn), in_dims=(None, 0, 0))(params, inputs, targets)
+            for local_grad,global_grad in zip(gradients.values(),global_gradient):
+                result += torch.sum(local_grad * global_grad,dim=tuple(range(1,local_grad.ndim)))
+            self.trainloader.dataset.update(result)
+        value:np.array = self.trainloader.dataset.get_value(self.current_client.train_set_index)
+        self.current_client.buffer_idx = []
+        for label in self.current_client.distributed_labels.keys():
+            indices=np.where(self.current_client.train_set_label == label)[0]
+            valuee_at_indices = value[indices]
+            sorted_indices=indices[np.argsort(-valuee_at_indices)]
+            upper = min(len(sorted_indices),self.current_client.buffer_size[label])
+            self.current_client.buffer_idx.extend(self.current_client.train_set_index[0:upper])
+
+        for module in self.model.modules():
+            if isinstance(module,__NormBase):
+                module.track_running_stats = True # 取消BN层的mean、var跟踪
+        self.model = self.model.to("cpu")
 

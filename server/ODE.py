@@ -32,16 +32,25 @@ from client.ODE import ODETrainer, ODEClient
 from server.fedavg import FedAvgServer
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS
-from utls.dataset import CustomSampler
+from utls.dataset import NeedIndexDataset
 
 
 class ODEServer(FedAvgServer):
     def __init__(self, args = None, trainer_type=ODETrainer, client_type=ODEClient):
         super().__init__(args, trainer_type, client_type)
-        self.set_client_label() # 设定client的训练索引对应的标签
-
         self.train_set_len = len(self.trainset)
 
+        # 重新设置数据集
+        self.trainset = NeedIndexDataset(self.trainset)
+        self.train_sampler = self.trainset.sampler
+        self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
+                                      pin_memory=True, num_workers=8, persistent_workers=True,
+                                      sampler=self.train_sampler, pin_memory_device='cuda:0')
+        self.cuda_0_trainer.trainloader = self.trainloader
+
+        self.set_client_label() # 设定client的训练索引对应的标签
+
+        # 读取标签分布
         distribution_path = PROJECT_DIR / "data" / self.args["dataset"] / "all_stats.json"
         with open(distribution_path, "rb") as f:
             label_distribution = json.load(f)
@@ -55,18 +64,15 @@ class ODEServer(FedAvgServer):
 
         self.coordinate()
         self.init_client_buffer()
-
-        self.logger.log(self.client_instances[0].buffer)
-        self.logger.log(self.client_instances[0].buffer_idx)
-
-
-        self.global_gradient = None
+        self.global_gradient:list[torch.tensor] = None
     
     def set_client_label(self):
         for client_instance in self.client_instances:
             label = []
             for index in client_instance.train_set_index:
-                label.append(self.trainset[index.item()][1])
+                data = self.trainset[index]
+                assert index == data[0]
+                label.append(data[1][1]) # 注意这里的dataset是特别修改版
             client_instance.train_set_label = np.array(label) 
 
     def coordinate(self):
@@ -118,7 +124,19 @@ class ODEServer(FedAvgServer):
             weight[label] = (real_num[label]/real_tot)/(stored_num[label]/stored_tot)
         for client_instance in self.client_instances:
             client_instance.distributed_labels = {label:weight[label] for label in coordination[client_instance.client_id] }
+    
+    def init_client_buffer(self):
+        self.logger.log("===============start initializing client buffer================")
+        for client_instance in tqdm(self.client_instances):
+            buffer_per_label = {label:int(client_instance.buffer_size / len(client_instance.distributed_labels.keys())) for label in client_instance.distributed_labels.keys()}
+            for label in client_instance.distributed_labels.keys():
+                if sum(buffer_per_label.values()) == client_instance.buffer_size:
+                    break
+                else:
+                    buffer_per_label[label] += 1
+            client_instance.buffer_size = buffer_per_label
         
+
     def calculate_global_grad(self):
         self.logger.log("===============start calculating global grad================")
         for client_instance in self.client_instances:
@@ -129,35 +147,19 @@ class ODEServer(FedAvgServer):
             client_local_gradient.append(client_grad)
         self.global_gradient = [1 / self.train_set_len * torch.sum(torch.stack(client_grad,dim=-1),dim=-1) for client_grad in zip(*client_local_gradient)]
     
-    def init_client_buffer(self):
-        self.logger.log("===============start initializing global grad================")
-        for client_instance in tqdm(self.client_instances):
-            buffer_per_label = {label:int(client_instance.buffer_size / len(client_instance.distributed_labels.keys())) for label in client_instance.distributed_labels.keys()}
-            for label in client_instance.distributed_labels.keys():
-                if sum(buffer_per_label.values()) == client_instance.buffer_size:
-                    break
-                else:
-                    buffer_per_label[label] += 1
-            client_instance.buffer_size = buffer_per_label
-            for label in client_instance.distributed_labels.keys():
-                client_instance.new_num_train_samples += client_instance.distributed_labels[label] * client_instance.buffer_size[label] # # new weight for model aggregation
-                client_instance.buffer[label] = queue.PriorityQueue(client_instance.buffer_size[label]) # 指定队列的最大容量
-                index_ep2label = np.where(client_instance.train_set_label == label)[0] # 在列表中的索引
-                for i in index_ep2label[-client_instance.buffer_size[label]:]:
-                    i = i.item() 
-                    value_index = (-1e4,i,client_instance.train_set_index[i]) # 值，在队列中的索引，在训练集中的索引
-                    client_instance.buffer[label].put(value_index)
-                    client_instance.buffer_idx.append(client_instance.train_set_index[i].item())
-        
 
     def update_client_buffer(self):
         for client_id in self.current_selected_client_ids:
             self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict())
-            self.cuda_0_trainer.update_client_buffer(self.client_instances[client_id])
+            self.cuda_0_trainer.update_client_buffer(self.client_instances[client_id],self.global_gradient,self.args["update_batch_size"])
+            self.logger.log(len(self.client_instances[client_id].buffer_idx),self.client_instances[client_id].train_set_len)
+            
 
     def train_one_round(self,global_round):
         self.calculate_global_grad() # 计算全局梯度
         self.update_client_buffer()
+        client_model_cache = []  # 缓存梯度
+        
 
 
 if __name__ == "__main__":
