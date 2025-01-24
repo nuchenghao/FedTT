@@ -22,11 +22,11 @@ class myFedServer(FedAvgServer):
         self.current_global_epoch = 0
         self.need_to_keep = int(self.args['global_epoch'] * self.args['start'])
 
-    def train_one_round(self):
+    def train_one_round(self,global_round):
         client_model_cache = []  # 缓存梯度
         weight_cache = []  # 缓存梯度对应的权重
         client_training_time = []
-        trainer_synchronization = {'prune': False}
+        trainer_synchronization = {"round":global_round,'prune': False}
         if self.current_global_epoch >= self.need_to_keep:
             trainer_synchronization['prune'] = True
         for client_id in self.current_selected_client_ids:

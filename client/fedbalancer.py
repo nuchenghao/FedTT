@@ -52,7 +52,7 @@ class fedbalancerTrainer(FedAvgTrainer):
         else:
             under_threshold = []
             over_threshold = []
-            loss_value : np.array = self.trainloader.dataset.get_loss(self.current_client.train_set_index)
+            loss_value : np.array = self.trainloader.dataset.get_value(self.current_client.train_set_index)
             under_threshold = self.current_client.train_set_index[loss_value < self.synchronization['loss_threshold']]
             over_threshold = self.current_client.train_set_index[loss_value >= self.synchronization['loss_threshold']]
             L = max(S,len(over_threshold))
@@ -89,13 +89,14 @@ class fedbalancerTrainer(FedAvgTrainer):
             self.current_client.accuracy = 0.0
         self.model = self.model.to("cpu")  # 训练&验证 结束后将模型转移到cpu上
         self.current_client.model_dict = deepcopy(self.model.state_dict())  # 一定要深拷贝
-        loss_sum , min_loss , max_loss_80 = self.trainloader.dataset.get_min_max_loss(self.current_client.selected_data_index) # 注意，是selected_data_index
+        loss_sum , min_loss , max_loss_80 = self.trainloader.dataset.get_min_max_value(self.current_client.selected_data_index) # 注意，是selected_data_index
         self.current_client.metadata['lsum'] = loss_sum
         self.current_client.metadata['llow'] = min_loss
         self.current_client.metadata['lhigh'] = max_loss_80
         self.timer.stop() # 里面的一些操作带来的开销就权当是网络传输的时间了
         self.current_client.training_time = self.timer.times[-1]
         self.current_client.participate_once()
+        self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0) # 记录时间
         torch.cuda.empty_cache() # 释放缓存 
         return self.current_client
     

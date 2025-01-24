@@ -48,6 +48,8 @@ class BaseClient:
         self.grad = None #存梯度值
         self.buffer = None # 存persistent_buffers
 
+        self.training_time_record = {}
+
     def participate_once(self):
         self.participation_times += 1
 
@@ -137,6 +139,7 @@ class FedAvgTrainer:
         self.timer.stop() # 里面的一些操作带来的开销就权当是网络传输的时间了
         self.current_client.training_time = self.timer.times[-1]
         self.current_client.participate_once()
+        self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0) # 记录时间
         torch.cuda.empty_cache() # 释放缓存 
         return self.current_client
 

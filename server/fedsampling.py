@@ -24,7 +24,7 @@ class fedsampling(FedAvgServer):
             assert type(client_instance) == fedsamplingClient
             client_instance.set_estimator(self.M + 1) # 设置为最大值+1，因为fake无法取到上界
     
-    def train_one_round(self):
+    def train_one_round(self,global_round):
         client_grad = []
         client_buffer = []
         client_training_time = []
@@ -40,7 +40,7 @@ class fedsampling(FedAvgServer):
         # N_hat = (R - len(self.current_selected_client_ids) * (1 - self.alpha) * self.M / 2) / self.alpha
         self.K = int(N_hat * self.args['KN'])  # 占整体比例，这里就按照整体比例去算了
 
-        trainer_synchronization = {'KN': self.args['KN'] , "K" : self.K}
+        trainer_synchronization = {"round" : global_round ,'KN': self.args['KN'] , "K" : self.K}
         print(f"K:{self.K} N_hat:{N_hat}")
         for client_id in self.current_selected_client_ids:
             self.client_instances[client_id].model_dict = self.model.state_dict()

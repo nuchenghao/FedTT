@@ -29,7 +29,7 @@ from server.fedavg import FedAvgServer
 from client.fedbalancer import fedbalancerClient,fedbalancerTrainer
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS
-from utls.dataset import fedbalancerDataset
+from utls.dataset import NeedIndexDataset
 
 class fedbalancer(FedAvgServer):
     def __init__(self, args = None, trainer_type=fedbalancerTrainer, client_type=fedbalancerClient):
@@ -41,7 +41,7 @@ class fedbalancer(FedAvgServer):
         self.logger.log(f"========= batch_training_time: {self.batch_training_time}===========")
 
         # -------------------- 设置训练集和数据加载器--------------------------
-        self.trainset = fedbalancerDataset(self.trainset)
+        self.trainset = NeedIndexDataset(self.trainset)
         self.train_sampler = self.trainset.sampler
         self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
                                       pin_memory=True, num_workers=8, persistent_workers=True,
@@ -123,7 +123,7 @@ class fedbalancer(FedAvgServer):
 
             
 
-    def train_one_round(self):
+    def train_one_round(self,global_round):
         client_model_cache = []  # 缓存梯度
         weight_cache = []  # 缓存梯度对应的权重
         client_training_time = []
@@ -131,7 +131,7 @@ class fedbalancer(FedAvgServer):
         LHigh = []
         Lsum = []
         self.select_deadline(self.args['local_epoch'])
-        trainer_synchronization = {"deadline" : self.ddl_R , "loss_threshold" : self.lt}
+        trainer_synchronization = {"round":global_round,"deadline" : self.ddl_R , "loss_threshold" : self.lt}
         self.logger.log(trainer_synchronization,f"ddlr : {self.ddlr} ; ltr : {self.ltr}")
         for client_id in self.current_selected_client_ids:
             assert self.client_instances[client_id].client_id == client_id

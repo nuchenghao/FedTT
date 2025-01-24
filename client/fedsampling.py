@@ -76,6 +76,7 @@ class fedsamplingTrainer(FedAvgTrainer):
         self.timer.stop() # 里面的一些操作带来的开销就权当是网络传输的时间了
         self.current_client.training_time = self.timer.times[-1]
         self.current_client.participate_once()
+        self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0) # 记录时间
         self.current_client.grad = delta
         self.current_client.buffer = buffer
         torch.cuda.empty_cache() # 释放缓存 

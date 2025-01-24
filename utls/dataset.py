@@ -68,11 +68,11 @@ class CustomSampler(Sampler):
         # 返回索引的数量
         return len(self.indices)
 
-def fedbalancer_hack_indices(self):
+def NeedIndex_hack_indices(self):
     with torch.autograd.profiler.record_function(self._profile_name):
         if self._sampler_iter is None:
             self._reset()
-        if isinstance(self._dataset, fedbalancerDataset):
+        if isinstance(self._dataset, NeedIndexDataset):
             indices, data = self._next_data()
         else:
             data = self._next_data()
@@ -88,17 +88,17 @@ def fedbalancer_hack_indices(self):
                              "IterableDataset replica at each worker. Please see "
                              "https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset for examples.")
             warnings.warn(warn_msg)
-        if isinstance(self._dataset, fedbalancerDataset):
+        if isinstance(self._dataset, NeedIndexDataset):
             self._dataset.set_active_indices(indices)
         return data
 
 
-class fedbalancerDataset(Dataset):
+class NeedIndexDataset(Dataset):
     def __init__(self , dataset):
         self.dataset = dataset
-        self.loss = torch.zeros(len(self.dataset),dtype=torch.float32)
+        self.value = torch.zeros(len(self.dataset),dtype=torch.float32)
         self.cur_batch_index = None
-        _BaseDataLoaderIter.__next__ = fedbalancer_hack_indices # 在类内重载dataloader的__next__方法
+        _BaseDataLoaderIter.__next__ = NeedIndex_hack_indices # 在类内重载dataloader的__next__方法
     
     def __getattr__(self, name):
         # Delegate the method call to the self.dataset if it is not found in Wrapper
@@ -107,19 +107,19 @@ class fedbalancerDataset(Dataset):
     def set_active_indices(self, cur_batch_indices: torch.Tensor):
         self.cur_batch_index = cur_batch_indices
     
-    def get_loss(self,index : np.array):
-        return self.loss[index].numpy()
+    def get_value(self,index : np.array):
+        return self.value[index].numpy()
     
-    def get_min_max_loss(self,index:np.array):
-        _ = self.loss[index].numpy()
+    def get_min_max_value(self,index:np.array):
+        _ = self.value[index].numpy()
         return sum(_),np.min(_),_[np.abs(_ - np.percentile(_,80)).argmin()]
 
     def update(self , values):
         assert isinstance(values, torch.Tensor)
         batch_size = values.shape[0]
         assert len(self.cur_batch_index) == batch_size, 'not enough index'
-        loss_val = values.detach().clone()
-        self.loss[self.cur_batch_index.long()] = loss_val.cpu()
+        value_val = values.detach().clone()
+        self.value[self.cur_batch_index.long()] = value_val.cpu()
         return values.mean()
     
     def __len__(self):
@@ -130,10 +130,10 @@ class fedbalancerDataset(Dataset):
 
     @property
     def sampler(self):
-        return fedbalancerSampler(self , np.arange(len(self.dataset))) 
+        return NeedIndexSampler(self , np.arange(len(self.dataset))) 
 
-class fedbalancerSampler(Sampler):
-    def __init__(self, dataset : fedbalancerDataset , sample_indices : np.array):
+class NeedIndexSampler(Sampler):
+    def __init__(self, dataset : NeedIndexDataset , sample_indices : np.array):
         super().__init__()
         self.dataset = dataset
         self.sample_indices = sample_indices # 存储当前样本的索引，值为索引

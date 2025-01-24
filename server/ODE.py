@@ -1,12 +1,13 @@
 import pickle
 import sys
 import json
-import os
+from tqdm import tqdm
 import random
 from pathlib import Path
 from collections import OrderedDict
 from copy import deepcopy
 from typing import Dict, List
+import numpy as np
 import wandb
 import torch
 import yaml
@@ -37,10 +38,13 @@ from utls.dataset import CustomSampler
 class ODEServer(FedAvgServer):
     def __init__(self, args = None, trainer_type=ODETrainer, client_type=ODEClient):
         super().__init__(args, trainer_type, client_type)
+        self.set_client_label() # 设定client的训练索引对应的标签
+
+        self.train_set_len = len(self.trainset)
 
         distribution_path = PROJECT_DIR / "data" / self.args["dataset"] / "all_stats.json"
         with open(distribution_path, "rb") as f:
-            label_distribution = pickle.load(f)
+            label_distribution = json.load(f)
         for client_instance in self.client_instances:
             client_instance.label_distribution = label_distribution[str(client_instance.client_id)]["distribution"] # {'label':int}
             client_instance.buffer_size = client_instance.train_set_len * self.args['buffer_ratio']
@@ -50,17 +54,31 @@ class ODEServer(FedAvgServer):
         self.labels_per_client = self.data_num_classes # 每个client拥有的类别数
 
         self.coordinate()
+        self.init_client_buffer()
+
+        self.logger.log(self.client_instances[0].buffer)
+        self.logger.log(self.client_instances[0].buffer_idx)
+
+
+        self.global_gradient = None
     
+    def set_client_label(self):
+        for client_instance in self.client_instances:
+            label = []
+            for index in client_instance.train_set_index:
+                label.append(self.trainset[index.item()][1])
+            client_instance.train_set_label = np.array(label) 
+
     def coordinate(self):
         info_classes = {i:[] for i in range(self.data_num_classes)}
         size_classes = {i:0 for i in range(self.data_num_classes)}
         
         for client_instance in self.client_instances:
-            for label,value in client_instance.label_distribution:
-                info_classes[label].append((value,client_instance.client_id)) # 对每一个类别，存入(样本数，客户id)
-                size_classes[label] += value
-        sorted_classes = sorted(info_classes.items(),key=lambda i: len(i[1])) # 按照客户数排序，从小到大(即[]中元素的个数排序);返回值是一个列表[(label)]
-        sorted_classes = [i[0] for i in sorted_classes]
+            for label,value in client_instance.label_distribution.items():# 在label_distribution是{str:int}类型，后面需要细致处理一下
+                info_classes[int(label)].append((value,client_instance.client_id)) # 对每一个类别，存入(样本数，客户id)
+                size_classes[int(label)] += value
+        sorted_classes = sorted(info_classes.items(),key=lambda i: len(i[1])) # 按照客户数排序，从小到大(即[]中元素的个数排序);返回值是一个列表[(label,[(value,client id)])]
+        sorted_classes = [int(i[0]) for i in sorted_classes]
         for _class in sorted_classes:
             info_classes[_class]=sorted(info_classes[_class],key=lambda j :j[0] ,reverse=True)# 按照样本数排序，从大到小
         coordination = {idx: [] for idx in range(self.client_num)}
@@ -79,7 +97,7 @@ class ODEServer(FedAvgServer):
         real_num = size_classes
         for client_instance in self.client_instances:
             tmp_size = 0
-            coordination[client_instance.client_id]=sorted(coordination[client_instance.client_id],key=lambda y:client_instance.label_distribution[y], reverse=True)
+            coordination[client_instance.client_id]=sorted(coordination[client_instance.client_id],key=lambda y:client_instance.label_distribution[str(y)], reverse=True)
 
             for label in coordination[client_instance.client_id]:
                 stored_num[label] += int(client_instance.buffer_size / len(coordination[client_instance.client_id]))
@@ -88,7 +106,7 @@ class ODEServer(FedAvgServer):
             for label in coordination[client_instance.client_id]:
                 if tmp_size == client_instance.buffer_size:
                     break
-                else :
+                else : # 把多余的分给类别数量多的
                     tmp_size+=1
                     stored_num[label]+=1
         stored_tot = sum(stored_num.values())
@@ -101,9 +119,45 @@ class ODEServer(FedAvgServer):
         for client_instance in self.client_instances:
             client_instance.distributed_labels = {label:weight[label] for label in coordination[client_instance.client_id] }
         
-        for client_instance in self.client_instances: 
-            print(client_instance.client_id,client_instance.distributed_labels)
+    def calculate_global_grad(self):
+        self.logger.log("===============start calculating global grad================")
+        for client_instance in self.client_instances:
+            client_instance.model_dict = deepcopy(self.model.state_dict())
+        client_local_gradient :list[torch.tensor] = []
+        for client_instance in tqdm(self.client_instances):
+            client_grad = self.cuda_0_trainer.get_client_grad(client_instance)
+            client_local_gradient.append(client_grad)
+        self.global_gradient = [1 / self.train_set_len * torch.sum(torch.stack(client_grad,dim=-1),dim=-1) for client_grad in zip(*client_local_gradient)]
+    
+    def init_client_buffer(self):
+        self.logger.log("===============start initializing global grad================")
+        for client_instance in tqdm(self.client_instances):
+            buffer_per_label = {label:int(client_instance.buffer_size / len(client_instance.distributed_labels.keys())) for label in client_instance.distributed_labels.keys()}
+            for label in client_instance.distributed_labels.keys():
+                if sum(buffer_per_label.values()) == client_instance.buffer_size:
+                    break
+                else:
+                    buffer_per_label[label] += 1
+            client_instance.buffer_size = buffer_per_label
+            for label in client_instance.distributed_labels.keys():
+                client_instance.new_num_train_samples += client_instance.distributed_labels[label] * client_instance.buffer_size[label] # # new weight for model aggregation
+                client_instance.buffer[label] = queue.PriorityQueue(client_instance.buffer_size[label]) # 指定队列的最大容量
+                index_ep2label = np.where(client_instance.train_set_label == label)[0] # 在列表中的索引
+                for i in index_ep2label[-client_instance.buffer_size[label]:]:
+                    i = i.item() 
+                    value_index = (-1e4,i,client_instance.train_set_index[i]) # 值，在队列中的索引，在训练集中的索引
+                    client_instance.buffer[label].put(value_index)
+                    client_instance.buffer_idx.append(client_instance.train_set_index[i].item())
+        
 
+    def update_client_buffer(self):
+        for client_id in self.current_selected_client_ids:
+            self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict())
+            self.cuda_0_trainer.update_client_buffer(self.client_instances[client_id])
+
+    def train_one_round(self,global_round):
+        self.calculate_global_grad() # 计算全局梯度
+        self.update_client_buffer()
 
 
 if __name__ == "__main__":
@@ -113,4 +167,4 @@ if __name__ == "__main__":
     if args["set_seed"]:
         fix_random_seed(args["seed"])
     server = ODEServer(args=args)
-    # server.train()
+    server.train()

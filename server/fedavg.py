@@ -108,8 +108,8 @@ class FedAvgServer:
         self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
         self.model = MODEL_DICT[self.args["model"]](self.data_num_classes)
         # TODO ----------------------------- 数据加载器 --------------------------------
-        self.dataset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
-        self.testloader = DataLoader(Subset(self.dataset, list(range(len(self.dataset)))), batch_size=2048,
+        self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
+        self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=2048,
                                      shuffle=False, pin_memory=True, num_workers=8,
                                      persistent_workers=True, pin_memory_device='cuda:0')
         label_count = defaultdict(int)
@@ -152,7 +152,7 @@ class FedAvgServer:
             self.logger.log("-" * 30, f"[bold red]TRAINING EPOCH: {E + 1}[/bold red]", "-" * 30)
             self.current_selected_client_ids = self.client_sample_stream[E]
             self.logger.log(f"current selected clients: {self.current_selected_client_ids}")
-            training_time = self.train_one_round()
+            training_time = self.train_one_round( E + 1 )
             self.current_time += training_time
             self.model = self.model.to(self.device)
             accuracy = evaluate(torch.device("cuda:0"), self.model, self.testloader)
@@ -162,12 +162,14 @@ class FedAvgServer:
                             f"The Global model accuracy is {accuracy:.3f}%.")
             if self.args["wandb"]:
                 self.experiment.log({"acc": accuracy}, step=self.current_time)
+        for client_instance in self.client_instances:
+            self.logger.log(f"Client{client_instance.client_id}'s training time : {client_instance.training_time_record}")
 
-    def train_one_round(self):
+    def train_one_round(self,global_round):
         client_model_cache = []  # 缓存梯度
         weight_cache = []  # 缓存梯度对应的权重
         client_training_time = []
-        trainer_synchronization = {}
+        trainer_synchronization = {"round":global_round}
         for client_id in self.current_selected_client_ids:
             assert self.client_instances[client_id].client_id == client_id
             self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict())
