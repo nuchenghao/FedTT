@@ -65,7 +65,7 @@ class FedAvgTrainer:
     ):
         self.args = args
         self.device = device
-        self.model = model
+        self.model = model.to(self.device)
         self.model_size = sum(p.numel() * p.element_size() for p in self.model.parameters())  # 字节数量
 
         self.current_client = None
@@ -110,7 +110,6 @@ class FedAvgTrainer:
     def set_parameters(self, optimizer_state_dict, trainer_synchronization):
         self.optimizer.load_state_dict(optimizer_state_dict)  # 加载全局优化器
         self.model.load_state_dict(self.current_client.model_dict)
-        self.model = self.model.to(self.device)
         self.synchronization = trainer_synchronization
 
     def start(self,
@@ -134,7 +133,6 @@ class FedAvgTrainer:
             self.current_client.accuracy = evaluate(self.device, self.model, self.testloader)
         else:
             self.current_client.accuracy = 0.0
-        self.model = self.model.to("cpu")  # 训练&验证 结束后将模型转移到cpu上
         self.current_client.model_dict = deepcopy(self.model.state_dict())  # 一定要深拷贝
         self.timer.stop() # 里面的一些操作带来的开销就权当是网络传输的时间了
         self.current_client.training_time = self.timer.times[-1]

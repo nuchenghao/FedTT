@@ -48,7 +48,7 @@ class myFedServer(FedAvgServer):
         while not self.client_to_server.empty():
             modified_client_instance = self.client_to_server.get()
             assert modified_client_instance.client_id in self.current_selected_client_ids
-            client_model = {key: value.to(self.device) for key, value in modified_client_instance.model_dict.items()}
+            client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
             client_model_cache.append(client_model)
             weight_cache.append(modified_client_instance.train_set_len)
             client_training_time.append(round(modified_client_instance.training_time * 10.0))

@@ -8,10 +8,10 @@ seed: 16 # 注意修改data中的seed;
 
 client_num: 100 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 1
+global_epoch: 50
 local_epoch: 4
 batch_size: 128 # Data batch size for client local training.
-client_eval: False
+client_eval: True
 
 
 lr: 0.01 # Learning rate for client local training.
@@ -27,4 +27,4 @@ project: "resnet34_cinic10_16_dir_3"
 experiment_name: "ODE"
 
 buffer_ratio: 0.8
-update_batch_size: 96
+update_batch_size: 64

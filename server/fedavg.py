@@ -106,7 +106,7 @@ class FedAvgServer:
         torch.cuda.set_device("cuda:0")
         self.device = 'cuda:0'  # 全局模型的device默认为cuda:0
         self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
-        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes)
+        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes).to(self.device)
         # TODO ----------------------------- 数据加载器 --------------------------------
         self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
         self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=2048,
@@ -154,9 +154,7 @@ class FedAvgServer:
             self.logger.log(f"current selected clients: {self.current_selected_client_ids}")
             training_time = self.train_one_round( E + 1 )
             self.current_time += training_time
-            self.model = self.model.to(self.device)
             accuracy = evaluate(torch.device("cuda:0"), self.model, self.testloader)
-            self.model = self.model.to('cpu')
             self.logger.log(f"Finished training!!! Current global epoch training time: {training_time}.",
                             f"The global time is {self.current_time}",
                             f"The Global model accuracy is {accuracy:.3f}%.")
@@ -189,7 +187,7 @@ class FedAvgServer:
         while not self.client_to_server.empty():
             modified_client_instance = self.client_to_server.get()
             assert modified_client_instance.client_id in self.current_selected_client_ids
-            client_model = {key: value.to(self.device) for key, value in modified_client_instance.model_dict.items()}
+            client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
             client_model_cache.append(client_model)
             weight_cache.append(modified_client_instance.train_set_len)
             client_training_time.append(round(modified_client_instance.training_time * 10.0))
@@ -204,7 +202,6 @@ class FedAvgServer:
             client_model_cache,
             weight_cache,
     ):
-        self.model = self.model.to(self.device)
         with torch.no_grad():
             weights = torch.tensor(weight_cache, device=self.device) / sum(weight_cache)
             model_list = [list(delta.values()) for delta in client_model_cache]
@@ -214,7 +211,6 @@ class FedAvgServer:
             ]
             averaged_state_dict = OrderedDict(zip(client_model_cache[0].keys(), aggregated_model))
             self.model.load_state_dict(averaged_state_dict)
-        self.model.to("cpu")
 
 
 if __name__ == "__main__":

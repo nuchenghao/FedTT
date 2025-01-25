@@ -152,7 +152,7 @@ class fedbalancer(FedAvgServer):
         while not self.client_to_server.empty():
             modified_client_instance = self.client_to_server.get()
             assert modified_client_instance.client_id in self.current_selected_client_ids
-            client_model = {key: value.to(self.device) for key, value in modified_client_instance.model_dict.items()}
+            client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
             client_model_cache.append(client_model)
             weight_cache.append(len(modified_client_instance.selected_data_index))
             LLow.append(modified_client_instance.metadata['llow'])

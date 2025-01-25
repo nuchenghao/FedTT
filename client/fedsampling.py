@@ -66,7 +66,6 @@ class fedsamplingTrainer(FedAvgTrainer):
             self.current_client.accuracy = evaluate(self.device, self.model, self.testloader)
         else:
             self.current_client.accuracy = 0.0
-        self.model = self.model.to("cpu")  # 训练&验证 结束后将模型转移到cpu上
         delta = OrderedDict()
         for name , param in self.model.named_parameters():
             delta[name] = self.current_client.selected_data_num * (self.current_client.model_dict[name] - param.data)

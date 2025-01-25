@@ -87,7 +87,6 @@ class fedbalancerTrainer(FedAvgTrainer):
             self.current_client.accuracy = evaluate(self.device, self.model, self.testloader)
         else:
             self.current_client.accuracy = 0.0
-        self.model = self.model.to("cpu")  # 训练&验证 结束后将模型转移到cpu上
         self.current_client.model_dict = deepcopy(self.model.state_dict())  # 一定要深拷贝
         loss_sum , min_loss , max_loss_80 = self.trainloader.dataset.get_min_max_value(self.current_client.selected_data_index) # 注意，是selected_data_index
         self.current_client.metadata['lsum'] = loss_sum
