@@ -55,7 +55,7 @@ class ODEServer(FedAvgServer):
         with open(distribution_path, "rb") as f:
             label_distribution = json.load(f)
         for client_instance in self.client_instances:
-            client_instance.label_distribution = label_distribution[str(client_instance.client_id)]["distribution"] # {'label':int}
+            client_instance.label_num_distribution = label_distribution[str(client_instance.client_id)]["distribution"] # {'label':int}
             client_instance.buffer_size = client_instance.train_set_len * self.args['buffer_ratio']
 
 
@@ -80,11 +80,12 @@ class ODEServer(FedAvgServer):
         size_classes = {i:0 for i in range(self.data_num_classes)}
         
         for client_instance in self.client_instances:
-            for label,value in client_instance.label_distribution.items():# 在label_distribution是{str:int}类型，后面需要细致处理一下
+            for label,value in client_instance.label_num_distribution.items():# 在label_distribution是{str:int}类型，后面需要细致处理一下
                 info_classes[int(label)].append((value,client_instance.client_id)) # 对每一个类别，存入(样本数，客户id)
                 size_classes[int(label)] += value
+        assert sum(size_classes.values()) == self.train_set_len
         sorted_classes = sorted(info_classes.items(),key=lambda i: len(i[1])) # 按照客户数排序，从小到大(即[]中元素的个数排序);返回值是一个列表[(label,[(value,client id)])]
-        sorted_classes = [int(i[0]) for i in sorted_classes]
+        sorted_classes = [int(i[0]) for i in sorted_classes] #提取出标签
         for _class in sorted_classes:
             info_classes[_class]=sorted(info_classes[_class],key=lambda j :j[0] ,reverse=True)# 按照样本数排序，从大到小
         coordination = {idx: [] for idx in range(self.client_num)}
@@ -103,7 +104,7 @@ class ODEServer(FedAvgServer):
         real_num = size_classes
         for client_instance in self.client_instances:
             tmp_size = 0
-            coordination[client_instance.client_id]=sorted(coordination[client_instance.client_id],key=lambda y:client_instance.label_distribution[str(y)], reverse=True)
+            coordination[client_instance.client_id]=sorted(coordination[client_instance.client_id],key=lambda y:client_instance.label_num_distribution[str(y)], reverse=True)
 
             for label in coordination[client_instance.client_id]:
                 stored_num[label] += int(client_instance.buffer_size / len(coordination[client_instance.client_id]))
@@ -123,21 +124,25 @@ class ODEServer(FedAvgServer):
                 continue
             weight[label] = (real_num[label]/real_tot)/(stored_num[label]/stored_tot)
         for client_instance in self.client_instances:
-            client_instance.distributed_labels = {label:weight[label] for label in coordination[client_instance.client_id] }
+            client_instance.label_weight = {label:weight[label] for label in coordination[client_instance.client_id] }
             client_instance.weights_tensor = torch.zeros(self.data_num_classes,dtype=torch.float32,device=self.device)
-            for label,value in client_instance.distributed_labels.items():
+            for label,value in client_instance.label_weight.items():
                 client_instance.weights_tensor[label] = value
     
     def init_client_buffer(self):
         self.logger.log("===============start initializing client buffer================")
         for client_instance in tqdm(self.client_instances):
-            buffer_per_label = {label:int(client_instance.buffer_size / len(client_instance.distributed_labels.keys())) for label in client_instance.distributed_labels.keys()}
-            for label in client_instance.distributed_labels.keys():
+            buffer_per_label = {label:int(client_instance.buffer_size / len(client_instance.label_weight.keys())) for label in client_instance.label_weight.keys()}
+            for label in client_instance.label_weight.keys():
                 if sum(buffer_per_label.values()) == client_instance.buffer_size:
                     break
                 else:
                     buffer_per_label[label] += 1
             client_instance.buffer_size = buffer_per_label
+            new_num_train_samples = 0.0
+            for label in client_instance.label_weight.keys():
+                new_num_train_samples += client_instance.label_weight[label] * client_instance.buffer_size[label]
+            client_instance.new_weight4aggregation = new_num_train_samples
         
 
     def calculate_global_grad(self):
@@ -152,10 +157,10 @@ class ODEServer(FedAvgServer):
     
 
     def update_client_buffer(self):
-        for client_id in self.current_selected_client_ids:
+        for client_id in tqdm(self.current_selected_client_ids):
             self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict())
             self.cuda_0_trainer.update_client_buffer(self.client_instances[client_id],self.global_gradient,self.args["update_batch_size"])
-            self.logger.log(self.client_instances[client_id].train_set_len,len(self.client_instances[client_id].train_set_index))
+            # self.logger.log(self.client_instances[client_id].train_set_len,len(self.client_instances[client_id].train_set_index))
             
 
     def train_one_round(self,global_round):
@@ -176,7 +181,7 @@ class ODEServer(FedAvgServer):
             )
             assert modified_client_instance.client_id == client_id
             self.logger.log(
-                f"client {client_id} has finished and has participate {modified_client_instance.participation_times}. The local train set size is {modified_client_instance.train_set_len}. ",
+                f"client {client_id} has finished and has participate {modified_client_instance.participation_times}. The local train set size is {modified_client_instance.train_set_len} from {len(modified_client_instance.train_set_index)}. ",
                 f"The pretrained acc is {modified_client_instance.pretrained_accuracy:.3f}%. The local accuracy is {modified_client_instance.accuracy:.3f}%.",
                 f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}.")
             self.client_to_server.put(modified_client_instance)
@@ -186,7 +191,7 @@ class ODEServer(FedAvgServer):
             assert modified_client_instance.client_id in self.current_selected_client_ids
             client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
             client_model_cache.append(client_model)
-            weight_cache.append(modified_client_instance.train_set_len)
+            weight_cache.append(modified_client_instance.new_weight4aggregation)
             client_training_time.append(round(modified_client_instance.training_time * 10.0))
             self.client_instances[modified_client_instance.client_id] = modified_client_instance  # 更新client信息
 

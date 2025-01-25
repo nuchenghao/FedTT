@@ -31,13 +31,14 @@ class ODEClient(BaseClient):
         self.train_set_index = np.array(self.train_set_index)
         self.train_set_label = None
 
-        self.label_distribution = {}
+        self.label_num_distribution = {}
         self.buffer = {} # 拥有的每个标签对应一个优先队列
         self.buffer_idx = [] # 缓存的训练标签数量
         self.buffer_size = 100 # 后面会变成一个dict：每个标签缓存的数量
         self.new_num_train_samples = 0.0
-        self.distributed_labels = {} #dict{label(int):float}
+        self.label_weight = {} #dict{label(int):float}
         self.weights_tensor = None
+        self.new_weight4aggregation = 0.0
 
 class ODETrainer(FedAvgTrainer):
     def __init__(self, device, model, trainloader, testloader, args):
@@ -52,8 +53,14 @@ class ODETrainer(FedAvgTrainer):
         self.model.load_state_dict(self.current_client.model_dict)
         self.trainloader.sampler.set_index(self.current_client.train_set_index)  # 在里面实现了深拷贝
         self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
-
         self.model.train()
+
+        # 特殊层需要特殊处理----------
+        __NormBase = torch.nn.BatchNorm2d.__mro__[2] # <class 'torch.nn.modules.batchnorm._NormBase'> 
+        for module in self.model.modules():
+            if isinstance(module,__NormBase):
+                module.track_running_stats = False # 取消BN层的mean、var跟踪
+
         trainable_parameters = [p for p in self.model.parameters()]# 获得可学习的参数，构成一个list 
         gradient_list= [] # list[(torch.tensor, ... ,torch.tensor)]
         self.optimizer.zero_grad() # 优化器并没有使用任何的状态存储信息，因此可以复用
@@ -67,6 +74,14 @@ class ODETrainer(FedAvgTrainer):
             # 如果 inputs 是单个张量，返回值仍为元组，需通过索引 [0] 获取梯度。
             gradient_list.append(torch.autograd.grad(loss,trainable_parameters))
         sum_gradient = [torch.sum(torch.stack(grad,dim=-1),dim=-1) for grad in zip(*gradient_list)]
+
+
+        # 特殊层需要特殊处理----------
+        __NormBase = torch.nn.BatchNorm2d.__mro__[2] # <class 'torch.nn.modules.batchnorm._NormBase'> 
+        for module in self.model.modules():
+            if isinstance(module,__NormBase):
+                module.track_running_stats = True
+
         return sum_gradient
 
     def loss_fn(self,params, data, target):
@@ -94,14 +109,14 @@ class ODETrainer(FedAvgTrainer):
             inputs , targets = inputs.to(self.device, non_blocking=True) , targets.to(self.device, non_blocking=True)
             gradients: dict[str:torch.tensor] = vmap(grad(self.loss_fn), in_dims=(None, 0, 0))(params, inputs, targets)
             for local_grad,global_grad in zip(gradients.values(),global_gradient):
-                result += torch.sum(local_grad * global_grad,dim=tuple(range(1,local_grad.ndim)))
+                result += torch.sum(local_grad * global_grad,dim=tuple(range(1,local_grad.ndim)))#local_grad要比global高一维
             self.trainloader.dataset.update(result)
         value:np.array = self.trainloader.dataset.get_value(self.current_client.train_set_index)
         self.current_client.buffer_idx = []
-        for label in self.current_client.distributed_labels.keys():
+        for label in self.current_client.label_weight.keys():
             indices=np.where(self.current_client.train_set_label == label)[0]
-            valuee_at_indices = value[indices]
-            sorted_indices=indices[np.argsort(valuee_at_indices)]
+            value_at_indices = value[indices]
+            sorted_indices=indices[np.argsort(value_at_indices)]
             self.current_client.buffer_idx.extend(self.current_client.train_set_index[sorted_indices[-self.current_client.buffer_size[label]:]].tolist())
 
         for module in self.model.modules():
