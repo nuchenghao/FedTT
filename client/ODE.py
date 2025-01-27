@@ -166,7 +166,7 @@ class ODETrainer(FedAvgTrainer):
                 outputs = self.model(inputs)
                 loss = self.criterion_(outputs, targets)
                 weights = self.current_client.weights_tensor[targets]
-                loss = (1 / torch.sum(weights) * loss * weights).sum()
+                loss = (loss * weights / torch.sum(weights)).sum()
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()

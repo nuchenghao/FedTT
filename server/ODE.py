@@ -48,7 +48,6 @@ class ODEServer(FedAvgServer):
                                       sampler=self.train_sampler, pin_memory_device='cuda:0')
         self.cuda_0_trainer.trainloader = self.trainloader
 
-        self.set_client_label() # 设定client的训练索引对应的标签
 
         # 读取标签分布
         distribution_path = PROJECT_DIR / "data" / self.args["dataset"] / "all_stats.json"
@@ -56,11 +55,12 @@ class ODEServer(FedAvgServer):
             label_distribution = json.load(f)
         for client_instance in self.client_instances:
             client_instance.label_num_distribution = label_distribution[str(client_instance.client_id)]["distribution"] # {'label':int}
-            client_instance.buffer_size = client_instance.train_set_len * self.args['buffer_ratio']
+            client_instance.buffer_size = client_instance.train_set_len 
 
+        self.set_client_label() # 设定client的训练索引对应的标签
 
-        self.clients_per_label = self.client_num # 每个标签都会分配给所有客户
-        self.labels_per_client = self.data_num_classes # 每个client拥有的类别数
+        self.clients_per_label = self.client_num * self.args['labels_per_client'] # 每个标签都会分配给所有客户
+        self.labels_per_client = self.data_num_classes * self.args['labels_per_client'] # 每个client拥有的类别数
 
         self.coordinate()
         self.init_client_buffer()
@@ -75,6 +75,12 @@ class ODEServer(FedAvgServer):
                 label.append(data[1][1]) # 注意这里的dataset是特别修改版
             client_instance.train_set_label = np.array(label) 
 
+            # check :看数据集加载得一不一致
+            assert len(client_instance.label_num_distribution.keys()) == len(np.unique(client_instance.train_set_label))
+            for lable_ in client_instance.label_num_distribution.keys():
+                assert client_instance.label_num_distribution[lable_] == len(np.where(client_instance.train_set_label == int(lable_))[0])
+
+
     def coordinate(self):
         info_classes = {i:[] for i in range(self.data_num_classes)}
         size_classes = {i:0 for i in range(self.data_num_classes)}
@@ -88,10 +94,10 @@ class ODEServer(FedAvgServer):
         sorted_classes = [int(i[0]) for i in sorted_classes] #提取出标签
         for _class in sorted_classes:
             info_classes[_class]=sorted(info_classes[_class],key=lambda j :j[0] ,reverse=True)# 按照样本数排序，从大到小
-        coordination = {idx: [] for idx in range(self.client_num)}
+        coordination = {idx: [] for idx in range(self.client_num)} # 每个客户需要缓存的label有哪些
         for _class in sorted_classes:
             cnt = 0 
-            for (num,client_id) in info_classes[_class]:
+            for (num,client_id) in info_classes[_class]: # 优先给样本数多的客户
                 if num==0:
                     break
                 if cnt >= self.clients_per_label:
@@ -191,7 +197,9 @@ class ODEServer(FedAvgServer):
             assert modified_client_instance.client_id in self.current_selected_client_ids
             client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
             client_model_cache.append(client_model)
-            weight_cache.append(modified_client_instance.new_weight4aggregation)
+            # weight_cache.append(modified_client_instance.new_weight4aggregation)
+            weight_cache.append(modified_client_instance.train_set_len)
+
             client_training_time.append(round(modified_client_instance.training_time * 10.0))
             self.client_instances[modified_client_instance.client_id] = modified_client_instance  # 更新client信息
 
