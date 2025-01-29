@@ -64,9 +64,51 @@ class FedCaSeServer(FedAvgServer):
     def __init__(self, args = None, trainer_type=FedCaSeTrainer, client_type=FedCaSeClient):
         super().__init__(args, trainer_type, client_type)
 
-        # 初始化 R_S
+        # 初始化 
         for client_instance in self.client_instances:
-            client_instance.R_S = client_instance.R_S * self.args['R_S']
+            client_instance.R_S = int(client_instance.R_S * self.args['R_S'])
+            client_instance.train_set_index = np.array(client_instance.train_set_index)
+
+        self.trainset = FedCaseDataset(self.trainset)
+        self.train_sampler = self.trainset.sampler
+        self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
+                                      pin_memory=True, num_workers=8, persistent_workers=True,
+                                      sampler=self.train_sampler, pin_memory_device='cuda:0')
+        self.cuda_0_trainer.trainloader = self.trainloader
+
+    def train_one_round(self,global_round):
+        client_model_cache = []  # 缓存梯度
+        weight_cache = []  # 缓存梯度对应的权重
+        client_training_time = []
+        trainer_synchronization = {"round":global_round , "alpha":self.args["alpha"]}
+        for client_id in self.current_selected_client_ids:
+            assert self.client_instances[client_id].client_id == client_id
+            self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict())
+        for client_id in self.current_selected_client_ids:
+            modified_client_instance = self.cuda_0_trainer.start(
+                self.client_instances[client_id],
+                self.optimizer.state_dict(),
+                trainer_synchronization
+            )
+            assert modified_client_instance.client_id == client_id
+            self.logger.log(
+                f"client {client_id} has finished and has participate {modified_client_instance.participation_times}. The local train set size is {modified_client_instance.train_set_len}. ",
+                f"The pretrained acc is {modified_client_instance.pretrained_accuracy:.3f}%. The local accuracy is {modified_client_instance.accuracy:.3f}%.",
+                f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}.")
+            self.client_to_server.put(modified_client_instance)
+        assert self.client_to_server.qsize() == len(self.current_selected_client_ids)
+        while not self.client_to_server.empty():
+            modified_client_instance = self.client_to_server.get()
+            assert modified_client_instance.client_id in self.current_selected_client_ids
+            client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
+            client_model_cache.append(client_model)
+            weight_cache.append(modified_client_instance.train_set_len)
+            client_training_time.append(round(modified_client_instance.training_time * 10.0))
+            self.client_instances[modified_client_instance.client_id] = modified_client_instance  # 更新client信息
+
+        # 聚合并更新参数
+        self.aggregate(client_model_cache, weight_cache)  # 聚合梯度
+        return max(client_training_time)
 
 if __name__ == "__main__":
     parser = get_argparser().parse_args()

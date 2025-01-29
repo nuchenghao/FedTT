@@ -1,6 +1,6 @@
 import json
 import torch
-import random
+import math
 import numpy as np
 from collections import OrderedDict
 from copy import deepcopy
@@ -32,13 +32,25 @@ class FedCaSeClient(BaseClient):
         self.R_S = self.train_set_len
         self.num_cached = int(self.train_set_len * 0.1)
 
+        self.selected_samples_index = None
+
 
 class FedCaSeTrainer(FedAvgTrainer):
     def __init__(self, device, model, trainloader, testloader, args):
         super().__init__(device, model, trainloader, testloader, args)
+        self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
 
     def client_data_sampling(self):
         experience:torch.tensor = self.trainloader.dataset.get_value(self.current_client.train_set_index)
+        index_sorted_experience = torch.argsort(experience)
+        M_S_index = index_sorted_experience[-self.current_client.num_cached:]
+        r = max(math.ceil(self.synchronization['alpha'] * (self.current_client.R_S / len(M_S_index))),1)
+        rep_samples = M_S_index.repeat(r)
+        len_flash = self.current_client.R_S - len(rep_samples)
+        flash_index = index_sorted_experience[-(self.current_client.num_cached+len_flash):-self.current_client.num_cached]
+        self.current_client.selected_samples_index = self.current_client.train_set_index[torch.cat((rep_samples,flash_index),dim=0).numpy()]
+        self.current_client.train_set_len = len(self.current_client.selected_samples_index) # 更新，后续用于聚合时的参数
+
 
 
     def start(self,
@@ -49,4 +61,39 @@ class FedCaSeTrainer(FedAvgTrainer):
         self.timer.start()
         self.current_client = client
         self.set_parameters(optimizer_state_dict, trainer_synchronization)  # 设置参数
-        self.client_data_sampling()
+        
+        
+        if self.args['client_eval']:
+            self.current_client.pretrained_accuracy = evaluate(self.device, self.model, self.testloader)
+        else:
+            self.current_client.pretrained_accuracy = 0.0
+
+        self.local_train() # 本地训练
+
+        if self.args['client_eval']:
+            self.current_client.accuracy = evaluate(self.device, self.model, self.testloader)
+        else:
+            self.current_client.accuracy = 0.0
+        self.current_client.model_dict = deepcopy(self.model.state_dict())  # 一定要深拷贝
+        self.timer.stop() # 里面的一些操作带来的开销就权当是网络传输的时间了
+        self.current_client.training_time = self.timer.times[-1]
+        self.current_client.participate_once()
+        self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0) # 记录时间
+        torch.cuda.empty_cache() # 释放缓存 
+        return self.current_client
+    
+    def full_set(self):
+        self.model.train()
+        for _ in range(self.local_epoch):
+            self.client_data_sampling()
+            self.trainloader.sampler.set_index(self.current_client.selected_samples_index)  # 在里面实现了深拷贝
+            self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
+            for inputs, targets in self.trainloader:
+                inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets)
+                loss = self.trainloader.dataset.update(loss)
+                loss.backward()
+                self.optimizer.step()
+        torch.cuda.synchronize()

@@ -197,8 +197,7 @@ class ODEServer(FedAvgServer):
             assert modified_client_instance.client_id in self.current_selected_client_ids
             client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
             client_model_cache.append(client_model)
-            # weight_cache.append(modified_client_instance.new_weight4aggregation)
-            weight_cache.append(modified_client_instance.train_set_len)
+            weight_cache.append(modified_client_instance.new_weight4aggregation)
 
             client_training_time.append(round(modified_client_instance.training_time * 10.0))
             self.client_instances[modified_client_instance.client_id] = modified_client_instance  # 更新client信息

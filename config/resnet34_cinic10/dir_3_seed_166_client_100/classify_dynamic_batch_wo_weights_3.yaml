@@ -1,16 +1,16 @@
 algorithm: classify_dynamic_batch_wo_weights
-model: resnet50 # resnet18、
-dataset: cifar100 #cinic10、
+model: resnet34 
+dataset: cinic10 
 
 
 set_seed: True # True为设置种子，False为性能测试
 seed: 166 # 注意修改data中的seed;
 
-client_num: 30 #客户端数量
+client_num: 100 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
 global_epoch: 300
 local_epoch: 4
-batch_size: 96 # Data batch size for client local training.
+batch_size: 128 # Data batch size for client local training.
 client_eval: False
 
 lr: 0.01 # Learning rate for client local training.
@@ -22,11 +22,11 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "resnet50_cifar100_166_dir_5"
-experiment_name: "classify_dynamic_batch_wo_weights_4"
+project: "resnet34_cinic10_166_dir_3"
+experiment_name: "classify_dynamic_batch_wo_weights_3"
 
 
 # 我的方法超参数
-r: 0.4
+r: 0.3
 start: 0.1
 max_gpu_memory_GB: 22

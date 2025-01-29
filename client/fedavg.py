@@ -75,6 +75,7 @@ class FedAvgTrainer:
         self.local_epoch = self.args["local_epoch"]
         # TODO:---------------- 实现自己的方法时，这里需要加上reduction='none'-----------------------
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1).to(self.device)
+        self._criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
         self.optimizer = torch.optim.SGD(
             params=self.model.parameters(),
             lr=self.args["lr"],
@@ -148,7 +149,7 @@ class FedAvgTrainer:
                 inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
+                loss = self._criterion(outputs, targets).mean()
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
