@@ -51,7 +51,13 @@ class FedCaSeTrainer(FedAvgTrainer):
         self.current_client.selected_samples_index = self.current_client.train_set_index[torch.cat((rep_samples,flash_index),dim=0).numpy()]
         self.current_client.train_set_len = len(self.current_client.selected_samples_index) # 更新，后续用于聚合时的参数
 
-
+    def load_dataset(self):
+        if self.current_client.participation_times > 2:
+            self.client_data_sampling()
+            self.trainloader.sampler.set_index(self.current_client.selected_samples_index)  # 在里面实现了深拷贝
+        else:
+            self.trainloader.sampler.set_index(self.current_client.train_set_index)
+        self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
 
     def start(self,
               client,
@@ -61,7 +67,7 @@ class FedCaSeTrainer(FedAvgTrainer):
         self.timer.start()
         self.current_client = client
         self.set_parameters(optimizer_state_dict, trainer_synchronization)  # 设置参数
-        
+        self.load_dataset()
         
         if self.args['client_eval']:
             self.current_client.pretrained_accuracy = evaluate(self.device, self.model, self.testloader)
@@ -85,9 +91,6 @@ class FedCaSeTrainer(FedAvgTrainer):
     def full_set(self):
         self.model.train()
         for _ in range(self.local_epoch):
-            self.client_data_sampling()
-            self.trainloader.sampler.set_index(self.current_client.selected_samples_index)  # 在里面实现了深拷贝
-            self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
             for inputs, targets in self.trainloader:
                 inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
                 self.optimizer.zero_grad()

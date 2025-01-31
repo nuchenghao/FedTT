@@ -56,6 +56,7 @@ class FedCaseDataset(NeedIndexDataset):
         T_u_ = T_u_ if T_u_ !=0 else 1
         M_u = (self.value[index] - torch.min(self.value[index])) / M_u_
         T_u =(self.frequency[index] - torch.min(self.frequency[index])) / T_u_
+        assert len(self.experience[index]) == len(M_u + T_u)
         self.experience[index] = M_u + T_u
         return self.experience[index]
 
