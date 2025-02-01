@@ -149,7 +149,8 @@ class FedAvgTrainer:
                 inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
-                loss = self._criterion(outputs, targets).mean()
+                loss = self._criterion(outputs, targets).mean() # 两者会有稍许误差
+                # loss = self.criterion(outputs, targets)
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()

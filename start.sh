@@ -3,7 +3,7 @@
 # ------------------ seed 16 ---------------------------
 # python3 -u ./centralized/resnet50_cifar100.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/centralized.yaml
 
-# python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/data.yaml
+python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/data.yaml
 
 # python3 -u ./server/fedavg.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedavg.yaml
 
@@ -21,11 +21,7 @@
 # python3 -u ./server/ODE.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/ode.yaml
 
 # python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_0.yaml
-# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_0_1.yaml
-# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_1.yaml
-# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_1_1.yaml
-# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_2.yaml
-# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_2_1.yaml
+
 
 
 
