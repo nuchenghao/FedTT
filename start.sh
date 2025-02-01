@@ -3,7 +3,7 @@
 # ------------------ seed 16 ---------------------------
 # python3 -u ./centralized/resnet50_cifar100.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/centralized.yaml
 
-python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/data.yaml
+# python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/data.yaml
 
 # python3 -u ./server/fedavg.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedavg.yaml
 
@@ -20,7 +20,10 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 
 # python3 -u ./server/ODE.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/ode.yaml
 
-# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_0.yaml
+# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_6.yaml
+# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_7.yaml
+# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_8.yaml
+# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase_9.yaml
 
 
 
@@ -30,7 +33,6 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/classify_dynamic_batch_wo_weights_3.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss_wo_weights_4.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss_wo_weights_3.yaml
-
 
 
 
@@ -227,6 +229,16 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss_wo_weights_3.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss_wo_weights_4.yaml
 
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch2.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch5.yaml
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss2.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss5.yaml
+
+
+
 
 
 # # ------------------ seed 166 ---------------------------
@@ -257,6 +269,18 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166_client_100/loss_dynamic_batch_global_loss_wo_weights_3.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166_client_100/loss_dynamic_batch_global_loss_wo_weights_4.yaml
 
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166_client_100/classify_dynamic_batch1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166_client_100/classify_dynamic_batch2.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166_client_100/classify_dynamic_batch5.yaml
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166_client_100/loss_dynamic_batch_global_loss1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166_client_100/loss_dynamic_batch_global_loss2.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166_client_100/loss_dynamic_batch_global_loss5.yaml
+
+
+
+
+
 # # ------------------ seed 1666 ---------------------------
 # python3 -u ./centralized/resnet34_cinic10.py --config_path ./config/resnet34_cinic10/dir_3_seed_1666_client_100/centralized.yaml
 
@@ -286,6 +310,13 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_1666_client_100/loss_dynamic_batch_global_loss_wo_weights_3.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_1666_client_100/loss_dynamic_batch_global_loss_wo_weights_4.yaml
 
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_1666_client_100/classify_dynamic_batch1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_1666_client_100/classify_dynamic_batch2.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_1666_client_100/classify_dynamic_batch5.yaml
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_1666_client_100/loss_dynamic_batch_global_loss1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_1666_client_100/loss_dynamic_batch_global_loss2.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_1666_client_100/loss_dynamic_batch_global_loss5.yaml
 
 
 
@@ -316,6 +347,18 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16666_client_100/loss_dynamic_batch_global_loss_wo_weights_3.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16666_client_100/loss_dynamic_batch_global_loss_wo_weights_4.yaml
 
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16666_client_100/classify_dynamic_batch1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16666_client_100/classify_dynamic_batch2.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16666_client_100/classify_dynamic_batch5.yaml
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16666_client_100/loss_dynamic_batch_global_loss1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16666_client_100/loss_dynamic_batch_global_loss2.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16666_client_100/loss_dynamic_batch_global_loss5.yaml
+
+
+
+
+
 
 # # ------------------ seed 166666 ---------------------------
 # python3 -u ./centralized/resnet34_cinic10.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/centralized.yaml
@@ -341,3 +384,11 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/classify_dynamic_batch_wo_weights_4.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/loss_dynamic_batch_global_loss_wo_weights_3.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/loss_dynamic_batch_global_loss_wo_weights_4.yaml
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/classify_dynamic_batch1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/classify_dynamic_batch2.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/classify_dynamic_batch5.yaml
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/loss_dynamic_batch_global_loss1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/loss_dynamic_batch_global_loss2.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/loss_dynamic_batch_global_loss5.yaml
