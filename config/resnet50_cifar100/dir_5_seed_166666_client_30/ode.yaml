@@ -1,15 +1,15 @@
-algorithm: fedcase
+algorithm: ODE
 model: resnet50 # resnet18、
 dataset: cifar100 #cinic10、
 
 
 set_seed: True # True为设置种子，False为性能测试
-seed: 16 # 注意修改data中的seed;
+seed: 166666 # 注意修改data中的seed;
 
 client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 1200
-local_epoch: 1
+global_epoch: 400
+local_epoch: 4
 batch_size: 96 # Data batch size for client local training.
 client_eval: False
 
@@ -23,8 +23,8 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "resnet50_cifar100_16_dir_5"
-experiment_name: "fedcase_9"
+project: "resnet50_cifar100_166666_dir_5"
+experiment_name: "ODE"
 
-R_S: 0.9
-alpha: 0.0
+labels_per_client: 1.0
+update_batch_size: 48

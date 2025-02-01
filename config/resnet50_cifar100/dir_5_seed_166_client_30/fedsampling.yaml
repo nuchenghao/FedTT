@@ -4,7 +4,7 @@ dataset: cifar100 #cinic10、
 
 
 set_seed: True # True为设置种子，False为性能测试
-seed: 1666 # 注意修改data中的seed;
+seed: 166 # 注意修改data中的seed;
 
 client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
@@ -22,6 +22,6 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "resnet50_cifar100_1666_dir_5"
-experiment_name: "fedsampling 1"
+project: "resnet50_cifar100_166_dir_5"
+experiment_name: "fedsampling"
 KN: 1

@@ -6,9 +6,9 @@ dataset: cifar100 #cinic10、
 set_seed: True # True为设置种子，False为性能测试
 seed: 166 # 注意修改data中的seed;
 
-client_num: 100 #客户端数量
+client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 300
+global_epoch: 400
 local_epoch: 4
 batch_size: 96 # Data batch size for client local training.
 client_eval: False
@@ -26,5 +26,5 @@ wandb: 1
 project: "resnet50_cifar100_166_dir_5"
 experiment_name: "ODE"
 
-buffer_ratio: 0.8
+labels_per_client: 1.0
 update_batch_size: 48
