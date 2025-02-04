@@ -1,4 +1,4 @@
-algorithm: fedsampling
+algorithm: fedcase
 model: resnet34 # resnet18、
 dataset: cinic10 #cinic10、
 
@@ -8,10 +8,11 @@ seed: 16666 # 注意修改data中的seed;
 
 client_num: 100 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 1200 
+global_epoch: 1200
 local_epoch: 1
 batch_size: 128 # Data batch size for client local training.
 client_eval: False
+
 
 lr: 0.01 # Learning rate for client local training.
 momentum: 0.0 # Momentum for client local opitimizer.
@@ -23,5 +24,7 @@ save_log: 1 # Non-zero value for saving algorithm running log
 # wandb记录
 wandb: 1
 project: "resnet34_cinic10_16666_dir_3"
-experiment_name: "fedsampling 1"
-KN: 1
+experiment_name: "fedcase"
+
+R_S: 0.9
+alpha: 0.0
