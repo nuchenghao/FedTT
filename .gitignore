@@ -4,3 +4,5 @@ trainlog/
 data/cifar100
 data/cinic10
 data/femnist/data
+data/snli_1.0
+data/__MACOSX

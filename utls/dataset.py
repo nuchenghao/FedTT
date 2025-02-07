@@ -8,44 +8,6 @@ import numpy as np
 import warnings
 
 
-class CustomDataset(Dataset):
-    def __init__(self, samples, targets):
-        self.samples = samples
-        self.targets = targets
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, index):
-        sample = self.samples[index]
-        target = self.targets[index]
-
-        # Convert the sample and target to PyTorch tensors if needed
-        sample = Tensor(sample)
-        target = Tensor(target)
-
-        return sample, target
-
-
-class CustomTextDataset(Dataset):
-    def __init__(self, samples, targets):
-        self.samples = samples
-        self.targets = targets
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, index):
-        sample = self.samples[index]
-        target = self.targets[index]
-
-        # Convert the sample and target to PyTorch tensors if needed
-        # text type sample = Tensor(sample)
-        target = Tensor(target)
-
-        return sample, target
-
-
 class CustomSampler(Sampler):
     def __init__(self, indices):
         super(CustomSampler, self).__init__()
@@ -97,6 +59,7 @@ class NeedIndexDataset(Dataset):
     def __init__(self , dataset):
         self.dataset = dataset
         self.value = torch.zeros(len(self.dataset),dtype=torch.float32)
+        self.classification = torch.zeros(len(self.dataset),dtype=torch.int)
         self.cur_batch_index = None
         _BaseDataLoaderIter.__next__ = NeedIndex_hack_indices # 在类内重载dataloader的__next__方法
     
@@ -113,6 +76,14 @@ class NeedIndexDataset(Dataset):
     def get_min_max_value(self,index:np.array):
         _ = self.value[index].numpy()
         return sum(_),np.min(_),_[np.abs(_ - np.percentile(_,80)).argmin()]
+
+    def set_classification(self , values):
+        assert isinstance(values, torch.Tensor)
+        batch_size = values.shape[0]
+        assert len(self.cur_batch_index) == batch_size, 'not enough index'
+        value_val = values.detach().clone()
+        self.value[self.cur_batch_index.long()] = value_val.cpu()
+        return values.mean()
 
     def update(self , values):
         assert isinstance(values, torch.Tensor)

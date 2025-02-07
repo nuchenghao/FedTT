@@ -55,7 +55,7 @@ class ODEServer(FedAvgServer):
             label_distribution = json.load(f)
         for client_instance in self.client_instances:
             client_instance.label_num_distribution = label_distribution[str(client_instance.client_id)]["distribution"] # {'label':int}
-            client_instance.buffer_size = min(client_instance.label_num_distribution)
+            client_instance.buffer_size = client_instance.train_set_len
 
         self.set_client_label() # 设定client的训练索引对应的标签
 

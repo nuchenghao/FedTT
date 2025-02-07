@@ -1,0 +1,32 @@
+algorithm: loss_dynamic_batch_global_loss
+model: resnet50 # resnet18、
+dataset: cifar100 #cinic10、
+
+
+set_seed: True # True为设置种子，False为性能测试
+seed: 166666 # 注意修改data中的seed;
+
+client_num: 30 #客户端数量
+client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
+global_epoch: 300
+local_epoch: 4
+batch_size: 96 # Data batch size for client local training.
+client_eval: False
+
+lr: 0.01 # Learning rate for client local training.
+momentum: 0.0 # Momentum for client local opitimizer.
+weight_decay: 0.0 # Weight decay for client local optimizer.
+
+# record
+save_log: 1 # Non-zero value for saving algorithm running log
+
+# wandb记录
+wandb: 1
+project: "resnet50_cifar100_166666_dir_5"
+experiment_name: "loss_dynamic_batch_global_loss_r3_s2"
+
+
+# 我的方法超参数
+r: 0.3
+start: 0.2
+max_gpu_memory_GB: 22
