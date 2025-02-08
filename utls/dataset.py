@@ -57,9 +57,9 @@ def NeedIndex_hack_indices(self):
 
 class NeedIndexDataset(Dataset):
     def __init__(self , dataset):
-        self.dataset = dataset
+        self.dataset = dataset    
         self.value = torch.zeros(len(self.dataset),dtype=torch.float32)
-        self.classification = torch.zeros(len(self.dataset),dtype=torch.int)
+        self.weight = torch.ones(len(self.dataset),dtype=torch.float32)
         self.cur_batch_index = None
         _BaseDataLoaderIter.__next__ = NeedIndex_hack_indices # 在类内重载dataloader的__next__方法
     
@@ -77,21 +77,17 @@ class NeedIndexDataset(Dataset):
         _ = self.value[index].numpy()
         return sum(_),np.min(_),_[np.abs(_ - np.percentile(_,80)).argmin()]
 
-    def set_classification(self , values):
-        assert isinstance(values, torch.Tensor)
-        batch_size = values.shape[0]
-        assert len(self.cur_batch_index) == batch_size, 'not enough index'
-        value_val = values.detach().clone()
-        self.value[self.cur_batch_index.long()] = value_val.cpu()
-        return values.mean()
 
-    def update(self , values):
+    def update(self , values , loss_ = True):
         assert isinstance(values, torch.Tensor)
         batch_size = values.shape[0]
         assert len(self.cur_batch_index) == batch_size, 'not enough index'
+        weight = self.weight[self.cur_batch_index].to("cuda:0")
         value_val = values.detach().clone()
         self.value[self.cur_batch_index.long()] = value_val.cpu()
-        return values.mean()
+        if loss_:
+            values.mul_(weight)
+            return values.mean()
     
     def __len__(self):
         return len(self.dataset)
@@ -102,6 +98,10 @@ class NeedIndexDataset(Dataset):
     @property
     def sampler(self):
         return NeedIndexSampler(self , np.arange(len(self.dataset))) 
+
+    def reset_weight(self,index,value):
+        self.weight[index] = value
+
 
 class NeedIndexSampler(Sampler):
     def __init__(self, dataset : NeedIndexDataset , sample_indices : np.array):

@@ -61,6 +61,11 @@
 
 
 
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/classify_dynamic_batch_wo_parallel_r3_s1.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss_wo_parallel_r3_s1.yaml
+
+
+
 # ------------------ seed 166 ---------------------------
 # python3 -u ./centralized/resnet50_cifar100.py --config_path ./config/resnet50_cifar100/dir_5_seed_166_client_30/centralized.yaml
 
@@ -476,3 +481,20 @@
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/loss_dynamic_batch_global_loss1.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/loss_dynamic_batch_global_loss2.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_166666_client_100/loss_dynamic_batch_global_loss5.yaml
+
+
+
+
+
+
+
+
+
+#===============================================================================================================================================================
+#-----------------------------rnn snli---------------------------------------
+#===============================================================================================================================================================
+# ---------------------- dir 0.3 ---------------------
+# ------------------ seed 16 ---------------------------
+
+
+python3 -u ./data/generate_data.py --config_path ./config/rnn_snli/dir_3_seed_16_client_100/data.yaml

@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import numpy as np
+from torch.autograd import Variable
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -138,8 +139,108 @@ def ResNet152():
     return ResNet(Bottleneck, [3, 8, 36, 3])
 
 
+
+class TextClassificationNet(nn.Module):
+    def __init__(
+        self,
+        word_embed_dim,
+        encoder_dim,
+        n_enc_layers,
+        dpout_model,
+        dpout_fc,
+        fc_dim,
+        classes,
+    ):
+        super(TextClassificationNet, self).__init__()
+
+        # Store settings.
+        self.encoder_dim = encoder_dim
+        self.n_enc_layers = n_enc_layers
+        self.dpout_fc = dpout_fc
+        self.fc_dim = fc_dim
+        self.classes = classes
+
+        # Construct encoder and classifier.
+        self.encoder = RecurrentEncoder(
+            n_enc_layers, word_embed_dim, encoder_dim, dpout_model
+        )
+        feature_multiplier = 4 
+        self.inputdim = feature_multiplier * self.encoder_dim
+        self.inputdim *= 2
+        self.classifier = nn.Sequential(
+                nn.Dropout(p=self.dpout_fc), # 在训练过程中随机失活（即设置为零）神经元的一部分输出，从而减少神经元之间的依赖性，提高模型的泛化能力。表示每个神经元被随机失活的概率
+                nn.Linear(self.inputdim, self.fc_dim),
+                nn.ReLU(),
+                nn.Dropout(p=self.dpout_fc),
+                nn.Linear(self.fc_dim, self.fc_dim),
+                nn.ReLU(),
+                nn.Dropout(p=self.dpout_fc),
+                nn.Linear(self.fc_dim, self.classes),
+            )
+
+    def forward(self, s1, s2):
+        u = self.encoder(s1)
+        v = self.encoder(s2)
+        features = torch.cat((u, v, torch.abs(u-v), u*v), 1)
+        output = self.classifier(features)
+        return output
+
+
+class RecurrentEncoder(nn.Module):
+
+    def __init__(
+        self, n_enc_layers, word_embed_dim, encoder_dim, dpout_model
+    ):
+        super(RecurrentEncoder, self).__init__()
+        self.n_enc_layers = n_enc_layers
+        self.word_embed_dim = word_embed_dim
+        self.encoder_dim = encoder_dim
+        self.dpout_model = dpout_model
+        
+        self.encoder = nn.RNN (
+            self.word_embed_dim,
+            self.encoder_dim,
+            self.n_enc_layers,
+            bidirectional=True,
+            dropout=self.dpout_model, # 如果层数大于1，指定每层之间的dropout概率
+        )
+
+    def forward(self, sent_tuple):
+        # sent_len: [max_len, ..., min_len] (batch_size)
+        # sent: Variable(seqlen x batch_size x word_embed_dim)
+        sent, sent_len = sent_tuple
+
+        self.encoder.flatten_parameters()
+
+        # Sort by length (keep idx)
+        sent_len, idx_sort = np.sort(sent_len)[::-1], np.argsort(-sent_len)
+        idx_unsort = np.argsort(idx_sort)
+
+        sent_len, idx_sort = sent_len.copy(), idx_sort.copy()
+        idx_sort = torch.from_numpy(idx_sort).to("cuda:0") 
+        sent = sent.index_select(1, Variable(idx_sort))
+
+        # Handling padding in Recurrent Networks ; 打包序列以优化RNN计算
+        sent_packed = nn.utils.rnn.pack_padded_sequence(sent, sent_len)
+        sent_output = self.encoder(sent_packed)[0]  # seqlen x batch x 2*nhid
+        sent_output = nn.utils.rnn.pad_packed_sequence(sent_output)[0]
+
+        # Un-sort by length
+        idx_unsort = torch.from_numpy(idx_unsort).to("cuda:0") 
+        sent_output = sent_output.index_select(1, Variable(idx_unsort))
+
+        # Pooling
+        emb = torch.max(sent_output, 0)[0]
+        if emb.ndimension() == 3:
+            emb = emb.squeeze(0)
+            assert emb.ndimension() == 2
+
+        return emb
+
+
 MODEL_DICT: dict = {
     "resnet18": ResNet18,
     "resnet34": ResNet34,
-    "resnet50": ResNet50
+    "resnet50": ResNet50,
+    "TextClassificationNet": TextClassificationNet,
 }

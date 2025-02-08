@@ -4,6 +4,7 @@ import queue
 import threading
 from py3nvml import py3nvml as nvml
 from fedavg import FedAvgTrainer
+import numpy as np
 
 nvml.nvmlInit()
 
@@ -38,7 +39,10 @@ class myFed(FedAvgTrainer):
             "classify_fixed_batch": self.classify_fixed_batch,
             "classify_dynamic_batch": self.classify_dynamic_batch,
             "classify_dynamic_batch_wo_weights": self.classify_dynamic_batch_wo_weights,
-            "loss_dynamic_batch_global_loss_wo_weights": self.loss_dynamic_batch_global_loss_wo_weights
+            "loss_dynamic_batch_global_loss_wo_weights": self.loss_dynamic_batch_global_loss_wo_weights,
+            "loss_dynamic_batch_global_loss_wo_parallel": self.loss_dynamic_batch_global_loss_wo_parallel,
+            "classify_dynamic_batch_wo_parallel":self.classify_dynamic_batch_wo_parallel
+
         }
 
         nvml.nvmlInit()
@@ -54,6 +58,61 @@ class myFed(FedAvgTrainer):
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, targets).mean()
                 loss.backward()
+                self.optimizer.step()
+        torch.cuda.synchronize()
+
+    def loss_dynamic_batch_global_loss_wo_parallel(self):
+        def select():
+            value : np.array = self.trainloader.dataset.get_value(self.current_client.train_set_index)
+            self.trainloader.dataset.reset_weight(self.current_client.train_set_index , 1.0)
+            well_classified = (value < value.mean())
+            well_classified_indices_train_set_index = np.where(well_classified)[0]
+            mis_classified_indices_train_set_index = np.where(~well_classified)[0].tolist()
+            selected_indices = np.random.choice(well_classified_indices_train_set_index, int(
+                self.r * len(well_classified_indices_train_set_index)), replace=False)
+            if len(selected_indices) > 0:
+                self.trainloader.dataset.reset_weight(self.current_client.train_set_index[selected_indices] , 1.0 / self.r)
+                mis_classified_indices_train_set_index.extend(selected_indices)
+            self.trainloader.sampler.set_index(self.current_client.train_set_index[mis_classified_indices_train_set_index])
+        self.model.train()
+        for _ in range(self.local_epoch):
+            select()
+            for inputs, targets in self.trainloader:
+                inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets)
+                loss = self.trainloader.dataset.update(loss)
+                loss.backward()
+                self.optimizer.step()
+        torch.cuda.synchronize()
+
+    def classify_dynamic_batch_wo_parallel(self):
+        def select():
+            value : np.array = self.trainloader.dataset.get_value(self.current_client.train_set_index)
+            self.trainloader.dataset.reset_weight(self.current_client.train_set_index , 1.0)
+            well_classified = (value == 1.0)
+            well_classified_indices_train_set_index = np.where(well_classified)[0]
+            mis_classified_indices_train_set_index = np.where(~well_classified)[0].tolist()
+            selected_indices = np.random.choice(well_classified_indices_train_set_index, int(
+                self.r * len(well_classified_indices_train_set_index)), replace=False)
+            if len(selected_indices) > 0:
+                self.trainloader.dataset.reset_weight(self.current_client.train_set_index[selected_indices] , 1.0 / self.r)
+                mis_classified_indices_train_set_index.extend(selected_indices)
+            self.trainloader.sampler.set_index(self.current_client.train_set_index[mis_classified_indices_train_set_index])
+        self.model.train()
+        for _ in range(self.local_epoch):
+            select()
+            for inputs, targets in self.trainloader:
+                inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets)
+                loss = self.trainloader.dataset.update(loss)
+                loss.backward()
+                pred = torch.argmax(outputs, -1)
+                correct = (pred == targets)
+                self.trainloader.dataset.update(correct,loss_=False)
                 self.optimizer.step()
         torch.cuda.synchronize()
 
@@ -148,7 +207,7 @@ class myFed(FedAvgTrainer):
     
 
     def loss_dynamic_batch_global_loss(self):
-        gpu_utilization = []
+        # gpu_utilization = []
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
         global_loss_threshold = self.current_client.loss
@@ -157,7 +216,7 @@ class myFed(FedAvgTrainer):
         cnt = 0
         for epoch in range(self.local_epoch):
             torch.cuda.reset_peak_memory_stats() # 重置显存峰值统计
-            gpu_utilization = []
+            # gpu_utilization = []
             total_correct = 0
             itertrainloader = iter(self.trainloader)  # 创建trainloader的迭代器
             self.inference_to_train.put(len(itertrainloader))  # 训练线程预加载
@@ -200,7 +259,7 @@ class myFed(FedAvgTrainer):
                             num_mis_classified = mis_classified.sum()
                             num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
                             total_correct += len(targets_raw)
-                            gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
+                            # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
                             self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                     torch.full((num_select_well,), 1 / self.r, device=self.device)))
                             self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]), dim=0)
@@ -283,12 +342,12 @@ class myFed(FedAvgTrainer):
     def classify_dynamic_batch(self):
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
-        gpu_utilization = []
+        # gpu_utilization = []
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
             torch.cuda.reset_peak_memory_stats() # 重置显存峰值统计
-            gpu_utilization = []
+            # gpu_utilization = []
             itertrainloader = iter(self.trainloader)  # 创建trainloader的迭代器
             self.inference_to_train.put(len(itertrainloader))  # 训练线程预加载,这里的值时batch_size会load的次数
             inputs_raw, targets_raw = next(itertrainloader)
@@ -328,7 +387,7 @@ class myFed(FedAvgTrainer):
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
                         num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
-                        gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
+                        # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
                         self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                             torch.full((num_select_well,), 1 / self.r, device=self.device)))
                         self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
@@ -346,12 +405,12 @@ class myFed(FedAvgTrainer):
     def classify_dynamic_batch_wo_weights(self):
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
-        gpu_utilization = []
+        # gpu_utilization = []
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
             torch.cuda.reset_peak_memory_stats() # 重置显存峰值统计
-            gpu_utilization = []
+            # gpu_utilization = []
             itertrainloader = iter(self.trainloader)  # 创建trainloader的迭代器
             self.inference_to_train.put(len(itertrainloader))  # 训练线程预加载,这里的值时batch_size会load的次数
             inputs_raw, targets_raw = next(itertrainloader)
@@ -390,7 +449,7 @@ class myFed(FedAvgTrainer):
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
                         num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
-                        gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
+                        # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
                         self.weights[cnt] = torch.ones(num_mis_classified + num_select_well, dtype=torch.float32, device=self.device)
                         self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
                         self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified],self.targets[cnt][well_classified][:num_select_well]), dim=0)
@@ -404,7 +463,7 @@ class myFed(FedAvgTrainer):
 
 
     def loss_dynamic_batch_global_loss_wo_weights(self):
-        gpu_utilization = []
+        # gpu_utilization = []
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
         global_loss_threshold = self.current_client.loss
@@ -413,7 +472,7 @@ class myFed(FedAvgTrainer):
         cnt = 0
         for epoch in range(self.local_epoch):
             torch.cuda.reset_peak_memory_stats() # 重置显存峰值统计
-            gpu_utilization = []
+            # gpu_utilization = []
             total_correct = 0
             itertrainloader = iter(self.trainloader)  # 创建trainloader的迭代器
             self.inference_to_train.put(len(itertrainloader))  # 训练线程预加载
@@ -455,7 +514,7 @@ class myFed(FedAvgTrainer):
                             num_mis_classified = mis_classified.sum()
                             num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
                             total_correct += len(targets_raw)
-                            gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
+                            # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
                             self.weights[cnt] = torch.ones(num_mis_classified + num_select_well, dtype=torch.float32, device=self.device)
                             self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]), dim=0)
                             self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]),dim=0)

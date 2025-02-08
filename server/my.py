@@ -7,6 +7,9 @@ from utls.utils import get_argparser, fix_random_seed
 from client.my import myFed
 from rich.console import Console
 import os
+from utls.dataset import NeedIndexDataset
+from torch.utils.data import DataLoader
+
 
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1' # debug
 
@@ -21,6 +24,14 @@ class myFedServer(FedAvgServer):
         super().__init__(args=args, trainer_type=myFed)
         self.current_global_epoch = 0
         self.need_to_keep = int(self.args['global_epoch'] * self.args['start'])
+
+        # 重新设置数据集
+        self.trainset = NeedIndexDataset(self.trainset)
+        self.train_sampler = self.trainset.sampler
+        self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
+                                      pin_memory=True, num_workers=8, persistent_workers=True,
+                                      sampler=self.train_sampler, pin_memory_device='cuda:0')
+        self.cuda_0_trainer.trainloader = self.trainloader
 
     def train_one_round(self,global_round):
         client_model_cache = []  # 缓存梯度
