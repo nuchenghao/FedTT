@@ -28,7 +28,6 @@ with open(PROJECT_DIR / "utls" / "network_distribution.json", 'r') as f:
 class ODEClient(BaseClient):
     def __init__(self, client_id, train_index, batch_size):
         super().__init__(client_id, train_index, batch_size)
-        self.train_set_index = np.array(self.train_set_index)
         self.train_set_label = None
 
         self.label_num_distribution = {}

@@ -28,7 +28,6 @@ class fedbalancerClient(BaseClient):
     def __init__(self, client_id, train_index, batch_size):
         super().__init__(client_id, train_index, batch_size)
         self.batch_training_time = 0.0 # 单位为s
-        self.train_set_index = np.array(self.train_set_index)
         self.len_OT = self.train_set_len
         self.selected_data_index = None
         self.metadata = {}
