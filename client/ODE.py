@@ -65,7 +65,11 @@ class ODETrainer(FedAvgTrainer):
         gradient_list= [] # list[(torch.tensor, ... ,torch.tensor)]
         self.optimizer.zero_grad() # 优化器并没有使用任何的状态存储信息，因此可以复用
         for inputs, targets in self.trainloader:
-            inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
+            if isinstance(inputs,torch.Tensor):
+                inputs = inputs.to(self.device, non_blocking=True)
+            else:
+                inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
+            targets = targets.to(self.device,non_blocking=True)
             outputs = self.model(inputs)
             loss = self.criterion_(outputs, targets).sum() # 求和并累计梯度
             # torch.autograd.grad() 是 PyTorch 中用于计算梯度的函数，它允许用户手动计算某个标量张量相对于其他张量的梯度。
@@ -106,7 +110,11 @@ class ODETrainer(FedAvgTrainer):
 
         for inputs,targets in self.trainloader:
             result=torch.zeros(len(targets),dtype=torch.float32,device=self.device)
-            inputs , targets = inputs.to(self.device, non_blocking=True) , targets.to(self.device, non_blocking=True)
+            if isinstance(inputs,torch.Tensor):
+                inputs = inputs.to(self.device, non_blocking=True)
+            else:
+                inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
+            targets = targets.to(self.device,non_blocking=True)
             gradients: dict[str:torch.tensor] = vmap(grad(self.loss_fn), in_dims=(None, 0, 0))(params, inputs, targets)
             for local_grad,global_grad in zip(gradients.values(),global_gradient):
                 result += torch.sum(local_grad * global_grad,dim=tuple(range(1,local_grad.ndim)))#local_grad要比global高一维
@@ -161,7 +169,11 @@ class ODETrainer(FedAvgTrainer):
         self.model.train()
         for _ in range(self.local_epoch):
             for inputs, targets in self.trainloader:
-                inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
+                if isinstance(inputs,torch.Tensor):
+                    inputs = inputs.to(self.device, non_blocking=True)
+                else:
+                    inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
+                targets = targets.to(self.device,non_blocking=True)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
                 loss = self.criterion_(outputs, targets)

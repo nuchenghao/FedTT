@@ -28,7 +28,7 @@ from client.fedavg import FedAvgTrainer, BaseClient
 from server.fedavg import FedAvgServer
 from client.fedbalancer import fedbalancerClient,fedbalancerTrainer
 from utls.models import MODEL_DICT
-from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS
+from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS_COLLATE_FN
 from utls.dataset import NeedIndexDataset
 
 class fedbalancer(FedAvgServer):
@@ -44,7 +44,7 @@ class fedbalancer(FedAvgServer):
         self.trainset = NeedIndexDataset(self.trainset)
         self.train_sampler = self.trainset.sampler
         self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
-                                      pin_memory=True, num_workers=8, persistent_workers=True,
+                                      pin_memory=True, num_workers=8, collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],persistent_workers=True,
                                       sampler=self.train_sampler, pin_memory_device='cuda:0')
         self.cuda_0_trainer.trainloader = self.trainloader
 

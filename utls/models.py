@@ -138,20 +138,20 @@ def ResNet101(num_classes=10):
 def ResNet152():
     return ResNet(Bottleneck, [3, 8, 36, 3])
 
+GLOVE_DIM = 300
 
-
-class TextClassificationNet(nn.Module):
+class biRNN(nn.Module):
     def __init__(
         self,
-        word_embed_dim,
-        encoder_dim,
-        n_enc_layers,
-        dpout_model,
-        dpout_fc,
-        fc_dim,
         classes,
+        word_embed_dim = GLOVE_DIM,
+        encoder_dim = 2048,
+        n_enc_layers = 1,
+        dpout_model = 0.0,
+        dpout_fc = 0.0 ,
+        fc_dim = 512,
     ):
-        super(TextClassificationNet, self).__init__()
+        super(biRNN, self).__init__()
 
         # Store settings.
         self.encoder_dim = encoder_dim
@@ -178,7 +178,8 @@ class TextClassificationNet(nn.Module):
                 nn.Linear(self.fc_dim, self.classes),
             )
 
-    def forward(self, s1, s2):
+    def forward(self, inputs):
+        s1,s2 = (inputs[0],inputs[1]),(inputs[2],inputs[3])
         u = self.encoder(s1)
         v = self.encoder(s2)
         features = torch.cat((u, v, torch.abs(u-v), u*v), 1)
@@ -187,54 +188,52 @@ class TextClassificationNet(nn.Module):
 
 
 class RecurrentEncoder(nn.Module):
-
-    def __init__(
-        self, n_enc_layers, word_embed_dim, encoder_dim, dpout_model
-    ):
-        super(RecurrentEncoder, self).__init__()
+    def __init__(self, n_enc_layers, word_embed_dim, encoder_dim, dpout_model):
+        super().__init__()
         self.n_enc_layers = n_enc_layers
         self.word_embed_dim = word_embed_dim
         self.encoder_dim = encoder_dim
         self.dpout_model = dpout_model
         
-        self.encoder = nn.RNN (
-            self.word_embed_dim,
-            self.encoder_dim,
-            self.n_enc_layers,
+        self.encoder = nn.RNN(
+            input_size=self.word_embed_dim,
+            hidden_size=self.encoder_dim,
+            num_layers=self.n_enc_layers,
             bidirectional=True,
-            dropout=self.dpout_model, # 如果层数大于1，指定每层之间的dropout概率
+            dropout=dpout_model if n_enc_layers > 1 else 0,
+            batch_first=False  # 保持与原始实现一致的seq_len-first格式
         )
 
     def forward(self, sent_tuple):
-        # sent_len: [max_len, ..., min_len] (batch_size)
-        # sent: Variable(seqlen x batch_size x word_embed_dim)
         sent, sent_len = sent_tuple
 
+        # 确保所有操作在同一个设备上
         self.encoder.flatten_parameters()
 
-        # Sort by length (keep idx)
-        sent_len, idx_sort = np.sort(sent_len)[::-1], np.argsort(-sent_len)
-        idx_unsort = np.argsort(idx_sort)
+        # 直接在GPU上进行排序（要求sent_len在GPU）
+        sorted_sent_len, idx_sort = torch.sort(sent_len, descending=True)
+        idx_unsort = torch.argsort(idx_sort)
 
-        sent_len, idx_sort = sent_len.copy(), idx_sort.copy()
-        idx_sort = torch.from_numpy(idx_sort).to("cuda:0") 
-        sent = sent.index_select(1, Variable(idx_sort))
+        # 索引操作保持在同一设备
+        sent = sent.index_select(1, idx_sort)
 
-        # Handling padding in Recurrent Networks ; 打包序列以优化RNN计算
-        sent_packed = nn.utils.rnn.pack_padded_sequence(sent, sent_len)
-        sent_output = self.encoder(sent_packed)[0]  # seqlen x batch x 2*nhid
-        sent_output = nn.utils.rnn.pad_packed_sequence(sent_output)[0]
+        # 处理长度数据到CPU（pack_padded_sequence要求）
+        sorted_lengths_cpu = sorted_sent_len.cpu()
 
-        # Un-sort by length
-        idx_unsort = torch.from_numpy(idx_unsort).to("cuda:0") 
-        sent_output = sent_output.index_select(1, Variable(idx_unsort))
+        # 打包序列时使用CPU长度
+        sent_packed = nn.utils.rnn.pack_padded_sequence(
+            sent, sorted_lengths_cpu, 
+            enforce_sorted=True  # 已排序可启用加速
+        )
 
-        # Pooling
-        emb = torch.max(sent_output, 0)[0]
-        if emb.ndimension() == 3:
-            emb = emb.squeeze(0)
-            assert emb.ndimension() == 2
+        sent_output, _ = self.encoder(sent_packed)
+        sent_output, _ = nn.utils.rnn.pad_packed_sequence(sent_output)
 
+        # 恢复原始顺序
+        sent_output = sent_output.index_select(1, idx_unsort)
+
+        # 优化的池化操作
+        emb = torch.max(sent_output, dim=0)[0]
         return emb
 
 
@@ -242,5 +241,5 @@ MODEL_DICT: dict = {
     "resnet18": ResNet18,
     "resnet34": ResNet34,
     "resnet50": ResNet50,
-    "TextClassificationNet": TextClassificationNet,
+    "biRNN": biRNN,
 }

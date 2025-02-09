@@ -133,7 +133,11 @@ def evaluate(
     all_pred = []
 
     for inputs, targets in dataloader:
-        inputs, targets = inputs.to(device, non_blocking=True), targets.to(device, non_blocking=True)
+        if isinstance(inputs,torch.Tensor):
+            inputs = inputs.to(device, non_blocking=True)
+        else:
+            inputs = [tensor.to(device, non_blocking=True) for tensor in inputs]
+        targets = targets.to(device,non_blocking=True)
         outputs = model(inputs)
         pred = torch.argmax(outputs, -1)
         correct += (pred == targets).sum().item()

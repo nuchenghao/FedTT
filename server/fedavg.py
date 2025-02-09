@@ -29,7 +29,7 @@ from utls.utils import (
 )
 from client.fedavg import FedAvgTrainer, BaseClient
 from utls.models import MODEL_DICT
-from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS
+from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
 from utls.dataset import CustomSampler
 
 
@@ -110,7 +110,7 @@ class FedAvgServer:
         # TODO ----------------------------- 数据加载器 --------------------------------
         self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
         self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=2048,
-                                     shuffle=False, pin_memory=True, num_workers=8,
+                                     shuffle=False, pin_memory=True, num_workers=8,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
                                      persistent_workers=True, pin_memory_device='cuda:0')
         label_count = defaultdict(int)
         for inputs, targets in self.testloader:
@@ -122,7 +122,7 @@ class FedAvgServer:
         self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "train")
         self.train_sampler = CustomSampler(list(range(len(self.trainset))))
         self.trainloader = DataLoader(Subset(self.trainset, list(range(len(self.trainset)))), self.args["batch_size"],
-                                      pin_memory=True, num_workers=8, persistent_workers=True,
+                                      pin_memory=True, num_workers=8,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
                                       sampler=self.train_sampler, pin_memory_device='cuda:0')
         label_count = defaultdict(int)
         for inputs, targets in self.trainloader:

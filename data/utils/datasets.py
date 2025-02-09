@@ -214,6 +214,33 @@ class SNLIDataset(torch.utils.data.Dataset):
     def n_words(self): # 返回词汇表中有效单词的数量（包含 GloVe 词向量的单词数）
         return len(self.word_vec)
 
+def collate_pad_double(data_points):
+    """ Pad data points with zeros to fit length of longest data point in batch. """
+    s1_embeds = [x[0][0] for x in data_points]
+    s2_embeds = [x[0][1] for x in data_points]
+    targets = [x[1] for x in data_points]
+
+    s1_lens = np.array([sent.shape[0] for sent in s1_embeds])
+    max_s1_len = np.max(s1_lens)
+    s2_lens = np.array([sent.shape[0] for sent in s2_embeds])
+    max_s2_len = np.max(s2_lens)
+
+    bs = len(data_points)
+    s1_embed = np.zeros((max_s1_len, bs, GLOVE_DIM))
+    s2_embed = np.zeros((max_s2_len, bs, GLOVE_DIM))
+    for i in range(bs):
+        e1 = s1_embeds[i]
+        e2 = s2_embeds[i]
+        s1_embed[: len(e1), i] = e1.clone() 
+        s2_embed[: len(e2), i] = e2.clone()
+
+    inputs = [torch.from_numpy(s1_embed).float(), torch.from_numpy(s1_lens), torch.from_numpy(s2_embed).float(), torch.from_numpy(s2_lens)]
+
+    # Convert targets to tensor.
+    targets = torch.cat(targets)
+
+    return inputs, targets
+
 
 DATASETS: Dict[str, Type[BaseDataset]] = {
     "femnist": FEMNIST,
@@ -228,6 +255,13 @@ DATA_NUM_CLASSES_DICT: Dict[str, int] = {
     "cifar100": 100,
     "snli": 3,
 }
+
+DATASETS_COLLATE_FN ={
+    "cinic10": None,
+    "cifar100": None,
+    "snli": collate_pad_double
+}
+
 DATA_TRANSFORMS = {
     "cinic10": {
         "train": transforms.Compose([

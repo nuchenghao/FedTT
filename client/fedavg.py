@@ -146,7 +146,11 @@ class FedAvgTrainer:
         self.model.train()
         for _ in range(self.local_epoch):
             for inputs, targets in self.trainloader:
-                inputs, targets = inputs.to(self.device, non_blocking=True), targets.to(self.device,non_blocking=True)
+                if isinstance(inputs,torch.Tensor):
+                    inputs = inputs.to(self.device, non_blocking=True)
+                else:
+                    inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
+                targets = targets.to(self.device,non_blocking=True)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
                 loss = self._criterion(outputs, targets).mean() # 两者会有稍许误差

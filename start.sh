@@ -497,4 +497,6 @@
 # ------------------ seed 16 ---------------------------
 
 
-python3 -u ./data/generate_data.py --config_path ./config/rnn_snli/dir_3_seed_16_client_100/data.yaml
+python3 -u ./data/generate_data.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/data.yaml
+
+python3 -u ./server/fedavg.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/fedavg.yaml
