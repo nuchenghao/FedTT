@@ -500,3 +500,5 @@
 python3 -u ./data/generate_data.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/data.yaml
 
 python3 -u ./server/fedavg.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/fedavg.yaml
+
+python3 -u ./server/fedbalancer.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/fedbalancer.yaml

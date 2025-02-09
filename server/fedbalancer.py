@@ -74,7 +74,11 @@ class fedbalancer(FedAvgServer):
         for _ in range(5):
             start.record()
             for inputs, targets in self.trainloader:
-                inputs, targets = inputs.to(self.device,non_blocking=True), targets.to(self.device,non_blocking=True)
+                if isinstance(inputs,torch.Tensor):
+                    inputs = inputs.to(self.device, non_blocking=True)
+                else:
+                    inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
+                targets = targets.to(self.device,non_blocking=True)
                 optimizer.zero_grad()
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
