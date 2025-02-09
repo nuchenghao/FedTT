@@ -40,9 +40,6 @@ class myFed(FedAvgTrainer):
             "classify_dynamic_batch": self.classify_dynamic_batch,
             "classify_dynamic_batch_wo_weights": self.classify_dynamic_batch_wo_weights,
             "loss_dynamic_batch_global_loss_wo_weights": self.loss_dynamic_batch_global_loss_wo_weights,
-            "loss_dynamic_batch_global_loss_wo_parallel": self.loss_dynamic_batch_global_loss_wo_parallel,
-            "classify_dynamic_batch_wo_parallel":self.classify_dynamic_batch_wo_parallel
-
         }
 
         nvml.nvmlInit()
@@ -62,69 +59,6 @@ class myFed(FedAvgTrainer):
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, targets).mean()
                 loss.backward()
-                self.optimizer.step()
-        torch.cuda.synchronize()
-
-    def loss_dynamic_batch_global_loss_wo_parallel(self):
-        def select():
-            value : np.array = self.trainloader.dataset.get_value(self.current_client.train_set_index)
-            self.trainloader.dataset.reset_weight(self.current_client.train_set_index , 1.0)
-            well_classified = (value < value.mean())
-            well_classified_indices_train_set_index = np.where(well_classified)[0]
-            mis_classified_indices_train_set_index = np.where(~well_classified)[0].tolist()
-            selected_indices = np.random.choice(well_classified_indices_train_set_index, int(
-                self.r * len(well_classified_indices_train_set_index)), replace=False)
-            if len(selected_indices) > 0:
-                self.trainloader.dataset.reset_weight(self.current_client.train_set_index[selected_indices] , 1.0 / self.r)
-                mis_classified_indices_train_set_index.extend(selected_indices)
-            self.trainloader.sampler.set_index(self.current_client.train_set_index[mis_classified_indices_train_set_index])
-        self.model.train()
-        for _ in range(self.local_epoch):
-            select()
-            for inputs, targets in self.trainloader:
-                if isinstance(inputs,torch.Tensor):
-                    inputs = inputs.to(self.device, non_blocking=True)
-                else:
-                    inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
-                targets = targets.to(self.device,non_blocking=True)
-                self.optimizer.zero_grad()
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
-                loss = self.trainloader.dataset.update(loss)
-                loss.backward()
-                self.optimizer.step()
-        torch.cuda.synchronize()
-
-    def classify_dynamic_batch_wo_parallel(self):
-        def select():
-            value : np.array = self.trainloader.dataset.get_value(self.current_client.train_set_index)
-            self.trainloader.dataset.reset_weight(self.current_client.train_set_index , 1.0)
-            well_classified = (value == 1.0)
-            well_classified_indices_train_set_index = np.where(well_classified)[0]
-            mis_classified_indices_train_set_index = np.where(~well_classified)[0].tolist()
-            selected_indices = np.random.choice(well_classified_indices_train_set_index, int(
-                self.r * len(well_classified_indices_train_set_index)), replace=False)
-            if len(selected_indices) > 0:
-                self.trainloader.dataset.reset_weight(self.current_client.train_set_index[selected_indices] , 1.0 / self.r)
-                mis_classified_indices_train_set_index.extend(selected_indices)
-            self.trainloader.sampler.set_index(self.current_client.train_set_index[mis_classified_indices_train_set_index])
-        self.model.train()
-        for _ in range(self.local_epoch):
-            select()
-            for inputs, targets in self.trainloader:
-                if isinstance(inputs,torch.Tensor):
-                    inputs = inputs.to(self.device, non_blocking=True)
-                else:
-                    inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
-                targets = targets.to(self.device,non_blocking=True)
-                self.optimizer.zero_grad()
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
-                loss = self.trainloader.dataset.update(loss)
-                loss.backward()
-                pred = torch.argmax(outputs, -1)
-                correct = (pred == targets)
-                self.trainloader.dataset.update(correct,loss_=False)
                 self.optimizer.step()
         torch.cuda.synchronize()
 
@@ -258,7 +192,9 @@ class myFed(FedAvgTrainer):
                         if isinstance(inputs_raw,torch.Tensor):
                             self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
                         else:
+                            inputs_raw[0],inputs_raw[2] = inputs_raw[0].permute(1, 0, 2),inputs_raw[2].permute(1, 0, 2)
                             self.inputs[cnt] = [torch.cat((tensor[mis_classified],tensor[well_classified][:num_select_well]),dim=0) for tensor in inputs_raw]
+                            self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                         self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
 
                 self.inference_event.record()
@@ -291,7 +227,9 @@ class myFed(FedAvgTrainer):
                             if isinstance(inputs_raw,torch.Tensor):
                                 self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
                             else:
+                                inputs_raw[0],inputs_raw[2] = inputs_raw[0].permute(1, 0, 2),inputs_raw[2].permute(1, 0, 2)
                                 self.inputs[cnt] = [torch.cat((tensor[mis_classified],tensor[well_classified][:num_select_well]),dim=0) for tensor in inputs_raw]
+                                self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                             self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]),dim=0)
                     self.inference_event.record()
                     cnt ^= 1
@@ -404,7 +342,9 @@ class myFed(FedAvgTrainer):
                         if isinstance(inputs_raw,torch.Tensor):
                             self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
                         else:
+                            inputs_raw[0],inputs_raw[2] = inputs_raw[0].permute(1, 0, 2),inputs_raw[2].permute(1, 0, 2)
                             self.inputs[cnt] = [torch.cat((tensor[mis_classified],tensor[well_classified][:num_select_well]),dim=0) for tensor in inputs_raw]
+                            self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                         self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]),dim=0)
 
                 self.inference_event.record()
@@ -422,21 +362,24 @@ class myFed(FedAvgTrainer):
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
                     with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
-                        outputs = self.inference_net(self.inputs[cnt])
-                        _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
-                        well_classified = self.targets[cnt] == predicted
-                        mis_classified = ~well_classified
-                        num_well_classified = well_classified.sum()
-                        num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
-                        # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
-                        self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
-                            torch.full((num_select_well,), 1 / self.r, device=self.device)))
-                        if isinstance(inputs_raw,torch.Tensor):
-                            self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
-                        else:
-                            self.inputs[cnt] = [torch.cat((tensor[mis_classified],tensor[well_classified][:num_select_well]),dim=0) for tensor in inputs_raw]
-                        self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified],self.targets[cnt][well_classified][:num_select_well]), dim=0)
+                        with torch.no_grad():
+                            outputs = self.inference_net(self.inputs[cnt])
+                            _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
+                            well_classified = self.targets[cnt] == predicted
+                            mis_classified = ~well_classified
+                            num_well_classified = well_classified.sum()
+                            num_mis_classified = mis_classified.sum()
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
+                            # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
+                            self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
+                                torch.full((num_select_well,), 1 / self.r, device=self.device)))
+                            if isinstance(inputs_raw,torch.Tensor):
+                                self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
+                            else:
+                                inputs_raw[0],inputs_raw[2] = inputs_raw[0].permute(1, 0, 2),inputs_raw[2].permute(1, 0, 2)
+                                self.inputs[cnt] = [torch.cat((tensor[mis_classified],tensor[well_classified][:num_select_well]),dim=0) for tensor in inputs_raw]
+                                self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
+                            self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified],self.targets[cnt][well_classified][:num_select_well]), dim=0)
 
                     self.inference_event.record()
                     self.barrier.wait()
@@ -482,7 +425,9 @@ class myFed(FedAvgTrainer):
                         if isinstance(inputs_raw,torch.Tensor):
                             self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
                         else:
+                            inputs_raw[0],inputs_raw[2] = inputs_raw[0].permute(1, 0, 2),inputs_raw[2].permute(1, 0, 2)
                             self.inputs[cnt] = [torch.cat((tensor[mis_classified],tensor[well_classified][:num_select_well]),dim=0) for tensor in inputs_raw]
+                            self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                         self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]),dim=0)
 
                 self.inference_event.record()
@@ -500,20 +445,23 @@ class myFed(FedAvgTrainer):
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
                     with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
-                        outputs = self.inference_net(self.inputs[cnt])
-                        _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
-                        well_classified = self.targets[cnt] == predicted
-                        mis_classified = ~well_classified
-                        num_well_classified = well_classified.sum()
-                        num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
-                        # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
-                        self.weights[cnt] = torch.ones(num_mis_classified + num_select_well, dtype=torch.float32, device=self.device)
-                        if isinstance(inputs_raw,torch.Tensor):
-                            self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
-                        else:
-                            self.inputs[cnt] = [torch.cat((tensor[mis_classified],tensor[well_classified][:num_select_well]),dim=0) for tensor in inputs_raw]
-                        self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified],self.targets[cnt][well_classified][:num_select_well]), dim=0)
+                        with torch.no_grad():
+                            outputs = self.inference_net(self.inputs[cnt])
+                            _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
+                            well_classified = self.targets[cnt] == predicted
+                            mis_classified = ~well_classified
+                            num_well_classified = well_classified.sum()
+                            num_mis_classified = mis_classified.sum()
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
+                            # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
+                            self.weights[cnt] = torch.ones(num_mis_classified + num_select_well, dtype=torch.float32, device=self.device)
+                            if isinstance(inputs_raw,torch.Tensor):
+                                self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
+                            else:
+                                inputs_raw[0],inputs_raw[2] = inputs_raw[0].permute(1, 0, 2),inputs_raw[2].permute(1, 0, 2)
+                                self.inputs[cnt] = [torch.cat((tensor[mis_classified],tensor[well_classified][:num_select_well]),dim=0) for tensor in inputs_raw]
+                                self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
+                            self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified],self.targets[cnt][well_classified][:num_select_well]), dim=0)
 
                     self.inference_event.record()
                     self.barrier.wait()
@@ -562,7 +510,9 @@ class myFed(FedAvgTrainer):
                         if isinstance(inputs_raw,torch.Tensor):
                             self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
                         else:
+                            inputs_raw[0],inputs_raw[2] = inputs_raw[0].permute(1, 0, 2),inputs_raw[2].permute(1, 0, 2)
                             self.inputs[cnt] = [torch.cat((tensor[mis_classified],tensor[well_classified][:num_select_well]),dim=0) for tensor in inputs_raw]
+                            self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                         self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
                 self.inference_event.record()
                 self.barrier.wait()
@@ -593,7 +543,9 @@ class myFed(FedAvgTrainer):
                             if isinstance(inputs_raw,torch.Tensor):
                                 self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
                             else:
+                                inputs_raw[0],inputs_raw[2] = inputs_raw[0].permute(1, 0, 2),inputs_raw[2].permute(1, 0, 2)
                                 self.inputs[cnt] = [torch.cat((tensor[mis_classified],tensor[well_classified][:num_select_well]),dim=0) for tensor in inputs_raw]
+                                self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                             self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]),dim=0)
                     self.inference_event.record()
                     cnt ^= 1

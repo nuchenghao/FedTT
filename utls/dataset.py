@@ -51,7 +51,7 @@ def NeedIndex_hack_indices(self):
                              "https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset for examples.")
             warnings.warn(warn_msg)
         if isinstance(self._dataset, NeedIndexDataset):
-            self._dataset.set_active_indices(indices)
+            self._dataset.set_current_indices(indices)
         return data
 
 
@@ -63,11 +63,8 @@ class NeedIndexDataset(Dataset):
         self.cur_batch_index = None
         _BaseDataLoaderIter.__next__ = NeedIndex_hack_indices # 在类内重载dataloader的__next__方法
     
-    def __getattr__(self, name):
-        # Delegate the method call to the self.dataset if it is not found in Wrapper
-        return getattr(self.dataset, name)
     
-    def set_active_indices(self, cur_batch_indices: torch.Tensor):
+    def set_current_indices(self, cur_batch_indices: torch.Tensor):
         self.cur_batch_index = cur_batch_indices
     
     def get_value(self,index : np.array):
@@ -84,7 +81,7 @@ class NeedIndexDataset(Dataset):
         assert len(self.cur_batch_index) == batch_size, 'not enough index'
         weight = self.weight[self.cur_batch_index].to("cuda:0")
         value_val = values.detach().clone()
-        self.value[self.cur_batch_index.long()] = value_val.cpu()
+        self.value[self.cur_batch_index] = value_val.cpu()
         if loss_:
             values.mul_(weight)
             return values.mean()

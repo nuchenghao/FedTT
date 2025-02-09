@@ -26,13 +26,6 @@ class myFedServer(FedAvgServer):
         self.current_global_epoch = 0
         self.need_to_keep = int(self.args['global_epoch'] * self.args['start'])
 
-        # 重新设置数据集
-        self.trainset = NeedIndexDataset(self.trainset)
-        self.train_sampler = self.trainset.sampler
-        self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
-                                      pin_memory=True, num_workers=8,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']] , persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device='cuda:0')
-        self.cuda_0_trainer.trainloader = self.trainloader
 
     def train_one_round(self,global_round):
         client_model_cache = []  # 缓存梯度

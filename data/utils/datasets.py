@@ -216,30 +216,59 @@ class SNLIDataset(torch.utils.data.Dataset):
 
 def collate_pad_double(data_points):
     """ Pad data points with zeros to fit length of longest data point in batch. """
-    s1_embeds = [x[0][0] for x in data_points]
-    s2_embeds = [x[0][1] for x in data_points]
-    targets = [x[1] for x in data_points]
+    if type(data_points[0][0]) == tuple:
+        s1_embeds = [x[0][0] for x in data_points]
+        s2_embeds = [x[0][1] for x in data_points]
+        targets = [x[1] for x in data_points]
 
-    s1_lens = np.array([sent.shape[0] for sent in s1_embeds])
-    max_s1_len = np.max(s1_lens)
-    s2_lens = np.array([sent.shape[0] for sent in s2_embeds])
-    max_s2_len = np.max(s2_lens)
+        s1_lens = np.array([sent.shape[0] for sent in s1_embeds])
+        max_s1_len = np.max(s1_lens)
+        s2_lens = np.array([sent.shape[0] for sent in s2_embeds])
+        max_s2_len = np.max(s2_lens)
 
-    bs = len(data_points)
-    s1_embed = np.zeros((max_s1_len, bs, GLOVE_DIM))
-    s2_embed = np.zeros((max_s2_len, bs, GLOVE_DIM))
-    for i in range(bs):
-        e1 = s1_embeds[i]
-        e2 = s2_embeds[i]
-        s1_embed[: len(e1), i] = e1.clone() 
-        s2_embed[: len(e2), i] = e2.clone()
+        bs = len(data_points)
+        s1_embed = np.zeros((max_s1_len, bs, GLOVE_DIM))
+        s2_embed = np.zeros((max_s2_len, bs, GLOVE_DIM))
+        for i in range(bs):
+            e1 = s1_embeds[i]
+            e2 = s2_embeds[i]
+            s1_embed[: len(e1), i] = e1.clone() 
+            s2_embed[: len(e2), i] = e2.clone()
 
-    inputs = [torch.from_numpy(s1_embed).float(), torch.from_numpy(s1_lens), torch.from_numpy(s2_embed).float(), torch.from_numpy(s2_lens)]
+        inputs = [torch.from_numpy(s1_embed).float(), torch.from_numpy(s1_lens), torch.from_numpy(s2_embed).float(), torch.from_numpy(s2_lens)]
 
-    # Convert targets to tensor.
-    targets = torch.cat(targets)
+        # Convert targets to tensor.
+        targets = torch.cat(targets)
 
-    return inputs, targets
+        return inputs, targets
+
+    else:
+        index = torch.tensor([elem[0] for elem in data_points])
+        data_points = [elem[1] for elem in data_points]
+        s1_embeds = [x[0][0] for x in data_points]
+        s2_embeds = [x[0][1] for x in data_points]
+        targets = [x[1] for x in data_points]
+
+        s1_lens = np.array([sent.shape[0] for sent in s1_embeds])
+        max_s1_len = np.max(s1_lens)
+        s2_lens = np.array([sent.shape[0] for sent in s2_embeds])
+        max_s2_len = np.max(s2_lens)
+
+        bs = len(data_points)
+        s1_embed = np.zeros((max_s1_len, bs, GLOVE_DIM))
+        s2_embed = np.zeros((max_s2_len, bs, GLOVE_DIM))
+        for i in range(bs):
+            e1 = s1_embeds[i]
+            e2 = s2_embeds[i]
+            s1_embed[: len(e1), i] = e1.clone() 
+            s2_embed[: len(e2), i] = e2.clone()
+
+        inputs = [torch.from_numpy(s1_embed).float(), torch.from_numpy(s1_lens), torch.from_numpy(s2_embed).float(), torch.from_numpy(s2_lens)]
+
+        # Convert targets to tensor.
+        targets = torch.cat(targets)
+
+        return index , (inputs, targets)
 
 
 DATASETS: Dict[str, Type[BaseDataset]] = {

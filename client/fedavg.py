@@ -28,7 +28,7 @@ with open(PROJECT_DIR / "utls" / "network_distribution.json", 'r') as f:
 class BaseClient:
     def __init__(self, client_id, train_index, batch_size):
         self.client_id = client_id
-        self.train_set_index = train_index
+        self.train_set_index = np.array(train_index)
         self.train_set_len = len(train_index)
         # self.compute_ability = np.random.choice(compute_heterogeneity, p=probability)
         self.communicate_ability = random.sample(network_distribution, 1)[0]

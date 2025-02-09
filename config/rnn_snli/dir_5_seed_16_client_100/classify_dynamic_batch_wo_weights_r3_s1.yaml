@@ -1,4 +1,4 @@
-algorithm: fedavg
+algorithm: classify_dynamic_batch_wo_weights
 model: biRNN # resnet18、
 dataset: snli #cinic10、
 
@@ -8,7 +8,7 @@ seed: 16 # 注意修改data中的seed;
 
 client_num: 100 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 6
+global_epoch: 30
 local_epoch: 4
 batch_size: 256 # Data batch size for client local training.
 client_eval: False
@@ -23,4 +23,10 @@ save_log: 1 # Non-zero value for saving algorithm running log
 # wandb记录
 wandb: 0
 project: "biRNN_snli_16_dir_5"
-experiment_name: "fedavg"
+experiment_name: "classify_dynamic_batch_wo_weights_r3_s1"
+
+
+# 我的方法超参数
+r: 0.3
+start: 0.0
+max_gpu_memory_GB: 22

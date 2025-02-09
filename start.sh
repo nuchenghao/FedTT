@@ -5,9 +5,9 @@
 # ------------------ seed 16 ---------------------------
 # python3 -u ./centralized/resnet50_cifar100.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/centralized.yaml
 
-# python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/data.yaml
+python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/data.yaml
 
-# python3 -u ./server/fedavg.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedavg.yaml
+python3 -u ./server/fedavg.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedavg.yaml
 
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/classify_dynamic_batch_r4_s1.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss_r4_s1.yaml
@@ -61,8 +61,6 @@
 
 
 
-# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/classify_dynamic_batch_wo_parallel_r3_s1.yaml
-# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/loss_dynamic_batch_global_loss_wo_parallel_r3_s1.yaml
 
 
 
@@ -497,8 +495,33 @@
 # ------------------ seed 16 ---------------------------
 
 
-python3 -u ./data/generate_data.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/data.yaml
+# python3 -u ./data/generate_data.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/data.yaml
 
-python3 -u ./server/fedavg.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/fedavg.yaml
+# python3 -u ./server/fedavg.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/fedavg.yaml
 
-python3 -u ./server/fedbalancer.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/fedbalancer.yaml
+# python3 -u ./server/fedbalancer.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/fedbalancer.yaml
+
+# python3 -u ./server/fedcase.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/fedcase.yaml
+
+# python3 -u ./server/fedsampling.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/fedsampling.yaml
+
+
+
+
+
+# python3 -u ./server/my.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/classify_dynamic_batch_r3_s1.yaml
+# python3 -u ./server/my.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/loss_dynamic_batch_global_loss_r3_s1.yaml
+
+
+
+
+
+# python3 -u ./server/my.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/loss_dynamic_batch_global_loss_wo_weights_r3_s1.yaml
+# python3 -u ./server/my.py --config_path ./config/rnn_snli/dir_5_seed_16_client_100/classify_dynamic_batch_wo_weights_r3_s1.yaml
+
+
+
+
+
+
+
