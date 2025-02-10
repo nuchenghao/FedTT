@@ -76,7 +76,11 @@ class ODETrainer(FedAvgTrainer):
             # 返回一个元组，包含 inputs 中每个张量的梯度。
             # 如果 inputs 是单个张量，返回值仍为元组，需通过索引 [0] 获取梯度。
             gradient_list.append(torch.autograd.grad(loss,trainable_parameters))
-        sum_gradient = [torch.sum(torch.stack(grad,dim=-1),dim=-1) for grad in zip(*gradient_list)]
+            del inputs,targets
+        sum_gradient = []
+        for grad in zip(*gradient_list):
+            sum_gradient.append(torch.sum(torch.stack(grad,dim=-1),dim=-1))
+            del grad
 
 
         # 特殊层需要特殊处理----------
@@ -105,18 +109,26 @@ class ODETrainer(FedAvgTrainer):
             if isinstance(module,__NormBase):
                 module.track_running_stats = False # 取消BN层的mean、var跟踪
         params = dict(self.model.named_parameters())
-
+        trainable_parameters = [p for p in self.model.parameters()]# 获得可学习的参数，构成一个list 
 
         for inputs,targets in self.trainloader:
             result=torch.zeros(len(targets),dtype=torch.float32,device=self.device)
             if isinstance(inputs,torch.Tensor):
                 inputs = inputs.to(self.device, non_blocking=True)
+                targets = targets.to(self.device,non_blocking=True)
+                gradients: dict[str:torch.tensor] = vmap(grad(self.loss_fn), in_dims=(None, 0, 0))(params, inputs, targets)
+                for local_grad,global_grad in zip(gradients.values(),global_gradient):
+                    result += torch.sum(local_grad * global_grad,dim=tuple(range(1,local_grad.ndim)))#local_grad要比global高一维
             else:
+                self.optimizer.zero_grad()
                 inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
-            targets = targets.to(self.device,non_blocking=True)
-            gradients: dict[str:torch.tensor] = vmap(grad(self.loss_fn), in_dims=(None, 0, 0))(params, inputs, targets)
-            for local_grad,global_grad in zip(gradients.values(),global_gradient):
-                result += torch.sum(local_grad * global_grad,dim=tuple(range(1,local_grad.ndim)))#local_grad要比global高一维
+                targets = targets.to(self.device,non_blocking=True)
+                outputs = self.model(inputs)
+                loss = self.criterion_(outputs, targets).mean()
+                _grad = torch.autograd.grad(loss,trainable_parameters) # 返回一个梯度列表，每个梯度对应一个输入参数。
+                self.optimizer.zero_grad()
+                for local_grad,global_grad in zip(_grad,global_gradient):
+                    result += torch.sum(local_grad * global_grad)#local_grad要比global高一维
             self.trainloader.dataset.update(result)
         value:np.array = self.trainloader.dataset.get_value(self.current_client.train_set_index)
         self.current_client.buffer_idx = []

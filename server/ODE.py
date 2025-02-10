@@ -1,4 +1,4 @@
-import pickle
+import os
 import sys
 import json
 from tqdm import tqdm
@@ -15,11 +15,11 @@ from rich.console import Console
 from collections import defaultdict
 from torch.utils.data import DataLoader, Subset
 from collections import Counter
-import queue
+import time
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 sys.path.append(PROJECT_DIR.as_posix())
 sys.path.append(PROJECT_DIR.joinpath("src").as_posix())
-
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 from utls.utils import (
     TRAIN_LOG,
     Logger,
