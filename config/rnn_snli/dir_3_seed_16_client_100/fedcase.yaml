@@ -1,4 +1,4 @@
-algorithm: ODE
+algorithm: fedcase
 model: biRNN # resnet18、
 dataset: snli #cinic10、
 
@@ -8,8 +8,8 @@ seed: 16 # 注意修改data中的seed;
 
 client_num: 100 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 400
-local_epoch: 4
+global_epoch: 1200
+local_epoch: 1
 batch_size: 256 # Data batch size for client local training.
 client_eval: False
 
@@ -21,9 +21,9 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 save_log: 1 # Non-zero value for saving algorithm running log 
 
 # wandb记录
-wandb: 0
-project: "biRNN_snli_16_dir_5"
-experiment_name: "ODE"
+wandb: 1
+project: "biRNN_snli_16_dir_3"
+experiment_name: "fedcase"
 
-labels_per_client: 1.0
-update_batch_size: 64
+R_S: 0.9
+alpha: 0.0

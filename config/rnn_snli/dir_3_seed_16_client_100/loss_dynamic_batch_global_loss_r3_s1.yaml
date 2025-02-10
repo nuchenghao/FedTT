@@ -1,4 +1,4 @@
-algorithm: classify_dynamic_batch
+algorithm: loss_dynamic_batch_global_loss
 model: biRNN # resnet18、
 dataset: snli #cinic10、
 
@@ -22,8 +22,8 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "biRNN_snli_16_dir_5"
-experiment_name: "classify_dynamic_batch_r3_s1"
+project: "biRNN_snli_16_dir_3"
+experiment_name: "loss_dynamic_batch_global_loss_r3_s1"
 
 
 # 我的方法超参数
