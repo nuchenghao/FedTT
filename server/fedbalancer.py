@@ -71,7 +71,7 @@ class fedbalancer(FedAvgServer):
         start=torch.cuda.Event(enable_timing=True)
         end=torch.cuda.Event(enable_timing=True)
         train_time = []
-        for _ in range(5):
+        for _ in range(2):
             start.record()
             for inputs, targets in self.trainloader:
                 if isinstance(inputs,torch.Tensor):
@@ -87,7 +87,7 @@ class fedbalancer(FedAvgServer):
             end.record()
             torch.cuda.synchronize()
             train_time.append(start.elapsed_time(end)/len(self.trainloader)/1000.0)# 每个batch的时间，单位为s
-        return sum(train_time[1:]) / len(train_time[1:])
+        return sum(train_time) / len(train_time)
 
     def lt_selection_next_round(self,LLow,LHigh):
         #  𝑙𝑡 selection for next (𝑅 + 1)-th round  (Algorithm 2)
