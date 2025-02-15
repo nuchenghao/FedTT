@@ -1,27 +1,21 @@
-algorithm: fedsampling
-model: biRNN # resnet18、
-dataset: snli #cinic10、
+algorithm: centralized
+model: biRNN 
+dataset: snli 
 
 
 set_seed: True # True为设置种子，False为性能测试
 seed: 16 # 注意修改data中的seed;
 
-client_num: 100 #客户端数量
-client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 800
-local_epoch: 1
+
+global_epoch: 30
 batch_size: 256 # Data batch size for client local training.
-client_eval: False
 
 lr: 0.01 # Learning rate for client local training.
 momentum: 0.0 # Momentum for client local opitimizer.
 weight_decay: 0.0 # Weight decay for client local optimizer.
 
-# record
-save_log: 1 # Non-zero value for saving algorithm running log 
 
 # wandb记录
 wandb: 1
 project: "biRNN_snli_16_dir_3"
-experiment_name: "fedsampling"
-KN: 1
+experiment_name: "centralized training"

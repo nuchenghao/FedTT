@@ -634,8 +634,9 @@
 # ---------------------- dir 0.3 ---------------------
 # ------------------ seed 16 ---------------------------
 
+# python3 -u ./centralized/biRNN_snli.py --config_path ./config/rnn_snli/dir_3_seed_16_client_100/centralized.yaml
 
-# python3 -u ./data/generate_data.py --config_path ./config/rnn_snli/dir_3_seed_16_client_100/data.yaml
+python3 -u ./data/generate_data.py --config_path ./config/rnn_snli/dir_3_seed_16_client_100/data.yaml
 
 # python3 -u ./server/my.py --config_path ./config/rnn_snli/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s1.yaml
 # python3 -u ./server/my.py --config_path ./config/rnn_snli/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss_r3_s1.yaml
@@ -648,7 +649,7 @@
 
 # python3 -u ./server/fedsampling.py --config_path ./config/rnn_snli/dir_3_seed_16_client_100/fedsampling.yaml
 
-# python3 -u ./server/ODE.py --config_path ./config/rnn_snli/dir_3_seed_16_client_100/ode.yaml
+python3 -u ./server/ODE.py --config_path ./config/rnn_snli/dir_3_seed_16_client_100/ode.yaml
 
 
 

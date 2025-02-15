@@ -155,11 +155,16 @@ class ODEServer(FedAvgServer):
         self.logger.log("===============start calculating global grad================")
         for client_instance in self.client_instances:
             client_instance.model_dict = deepcopy(self.model.state_dict())
-        client_local_gradient :list[torch.tensor] = []
+        cnt = 0
+        self.global_gradient = None 
         for client_instance in tqdm(self.client_instances):
-            client_grad = self.cuda_0_trainer.get_client_grad(client_instance)
-            client_local_gradient.append(client_grad)
-        self.global_gradient = [1 / self.train_set_len * torch.sum(torch.stack(client_grad,dim=-1),dim=-1) for client_grad in zip(*client_local_gradient)]
+            client_grad = self.cuda_0_trainer.get_client_grad(client_instance ,  1 / self.train_set_len)
+            if cnt == 0:
+                self.global_gradient = client_grad
+            else:
+                self.global_gradient = [torch.sum(torch.stack(_grad,dim=-1),dim=-1) for _grad in zip(self.global_gradient,client_grad)]
+            del client_grad
+            cnt += 1
     
 
     def update_client_buffer(self):

@@ -47,7 +47,7 @@ class ODETrainer(FedAvgTrainer):
 
 
 
-    def get_client_grad(self , client_instance):
+    def get_client_grad(self , client_instance , factor):
         self.current_client = client_instance
         self.model.load_state_dict(self.current_client.model_dict)
         self.trainloader.sampler.set_index(self.current_client.train_set_index)  # 在里面实现了深拷贝
@@ -61,7 +61,8 @@ class ODETrainer(FedAvgTrainer):
                 module.track_running_stats = False # 取消BN层的mean、var跟踪
 
         trainable_parameters = [p for p in self.model.parameters()]# 获得可学习的参数，构成一个list 
-        gradient_list= [] # list[(torch.tensor, ... ,torch.tensor)]
+        cnt = 0
+        gradient = [] # list[(torch.tensor, ... ,torch.tensor)]
         self.optimizer.zero_grad() # 优化器并没有使用任何的状态存储信息，因此可以复用
         for inputs, targets in self.trainloader:
             if isinstance(inputs,torch.Tensor):
@@ -75,21 +76,19 @@ class ODETrainer(FedAvgTrainer):
             # 与 backward() 不同，grad() 不会累积梯度到 .grad 属性中，而是直接返回梯度值。
             # 返回一个元组，包含 inputs 中每个张量的梯度。
             # 如果 inputs 是单个张量，返回值仍为元组，需通过索引 [0] 获取梯度。
-            gradient_list.append(torch.autograd.grad(loss,trainable_parameters))
-            del inputs,targets
-        sum_gradient = []
-        for grad in zip(*gradient_list):
-            sum_gradient.append(torch.sum(torch.stack(grad,dim=-1),dim=-1))
-            del grad
-
+            if cnt == 0:
+                gradient = torch.autograd.grad(loss,trainable_parameters)
+            else:
+                gradient =[torch.sum(torch.stack(grad,dim=-1),dim=-1) for grad in zip(gradient, torch.autograd.grad(loss,trainable_parameters))]
+            cnt += 1
 
         # 特殊层需要特殊处理----------
         __NormBase = torch.nn.BatchNorm2d.__mro__[2] # <class 'torch.nn.modules.batchnorm._NormBase'> 
         for module in self.model.modules():
             if isinstance(module,__NormBase):
                 module.track_running_stats = True
-
-        return sum_gradient
+        
+        return [factor * _grad for _grad in gradient]
 
     def loss_fn(self,params, data, target):
         # 使用 `torch.func` 的函数式 API 调用模型

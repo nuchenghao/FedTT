@@ -9,6 +9,7 @@ from torchvision import transforms, datasets
 from torch.utils.data import Dataset
 import torch
 import torchvision
+from os import path
 
 
 class BaseDataset(Dataset):
@@ -271,11 +272,59 @@ def collate_pad_double(data_points):
         return index , (inputs, targets)
 
 
+
+
+imgsize = 224
+def read_domainnet(dataset_path ,split ,selected_classes, selected_domain=["clipart","painting","sketch","real"]):
+    """
+    dataset_path：指向domainnet文件夹所在位置
+    selected_domain：选中的域
+    """
+    data_paths = []
+    data_labels = []
+    for domain_name in selected_domain:
+        split_file = path.join(dataset_path, "splits", "{}_{}.txt".format(domain_name, split))
+        with open(split_file, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                line = line.strip()
+                data_path, label = line.split(' ')
+                if int(label) >= selected_classes:
+                    continue
+                data_path = path.join(dataset_path, data_path)
+                data_paths.append(data_path)
+                data_labels.append(int(label))
+    return data_paths, data_labels
+
+class DomainNet(Dataset):
+    def __init__(self, root , which, selected_classes = 200):
+        super(DomainNet, self).__init__()
+        self.data_paths,self.targets = read_domainnet(root, which, selected_classes)
+        self.classes = list(range(selected_classes))
+        self.transforms = DATA_TRANSFORMS["domainnet"][which]
+
+    def __getitem__(self, index):
+        img = Image.open(self.data_paths[index])
+        if not img.mode == "RGB":
+            img = img.convert("RGB")
+        label = self.targets[index] 
+        img = self.transforms(img) # 做图像变换
+
+        return img, label
+
+    def __len__(self):
+        return len(self.data_paths)
+
+
+
+
+
 DATASETS: Dict[str, Type[BaseDataset]] = {
     "femnist": FEMNIST,
     "cinic10": CINIC10,
     "cifar100": CIFAR100,
     "snli": SNLIDataset,
+    "domainnet": DomainNet
 }
 
 DATA_NUM_CLASSES_DICT: Dict[str, int] = {
@@ -283,12 +332,14 @@ DATA_NUM_CLASSES_DICT: Dict[str, int] = {
     "cinic10": 10,
     "cifar100": 100,
     "snli": 3,
+    "domainnet": 200
 }
 
 DATASETS_COLLATE_FN ={
     "cinic10": None,
     "cifar100": None,
-    "snli": collate_pad_double
+    "snli": collate_pad_double,
+    "domainnet": None
 }
 
 DATA_TRANSFORMS = {
@@ -314,6 +365,30 @@ DATA_TRANSFORMS = {
         'test': transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5070751592371323, 0.48654887331495095, 0.4409178433670343), (0.2673342858792401, 0.2564384629170883, 0.27615047132568404))
+        ])
+    },
+    "domainnet": {
+        "train":transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Resize(
+            (224, 224),
+            interpolation=transforms.InterpolationMode.BICUBIC,
+            antialias=False,
+            ),
+        transforms.Normalize(
+          [0.6605686,0.6431999,0.61347884],
+          [0.33127954, 0.32900678, 0.34953416]),
+        ]),
+        "test": transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Resize(
+            (224, 224),
+            interpolation=transforms.InterpolationMode.BICUBIC,
+            antialias=False,
+            ),
+        transforms.Normalize(
+          [0.6605686,0.6431999,0.61347884],
+          [0.33127954, 0.32900678, 0.34953416]),
         ])
     }
 }
