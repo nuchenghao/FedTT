@@ -11,6 +11,7 @@ client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
 global_epoch: 1200 
 local_epoch: 1
 batch_size: 128 # Data batch size for client local training.
+t_batch_size: 2048
 client_eval: False
 
 lr: 0.01 # Learning rate for client local training.

@@ -9,6 +9,7 @@ seed: 1666 # 注意修改data中的seed;
 
 global_epoch: 100
 batch_size: 128 # Data batch size for client local training.
+t_batch_size: 2048
 
 lr: 0.01 # Learning rate for client local training.
 momentum: 0.0 # Momentum for client local opitimizer.

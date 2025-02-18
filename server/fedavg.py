@@ -15,6 +15,7 @@ from collections import defaultdict
 from torch.utils.data import DataLoader, Subset
 from collections import Counter
 import queue
+from tqdm import tqdm
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 sys.path.append(PROJECT_DIR.as_posix())
 sys.path.append(PROJECT_DIR.joinpath("src").as_posix())
@@ -107,29 +108,25 @@ class FedAvgServer:
         self.device = 'cuda:0'  # 全局模型的device默认为cuda:0
         self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
         self.model = MODEL_DICT[self.args["model"]](self.data_num_classes).to(self.device)
+        if self.args["model"] == 'vit':
+            for name, param in self.model.named_parameters():
+                if 'head' in name or 'lora' in name or 'Prompt' in name:
+                    param.requires_grad_(True)
+                else:
+                    param.requires_grad_(False)
         # TODO ----------------------------- 数据加载器 --------------------------------
         self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
-        self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=2048,
-                                     shuffle=False, pin_memory=True, num_workers=8,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
-                                     persistent_workers=True, pin_memory_device='cuda:0')
-        label_count = defaultdict(int)
-        for inputs, targets in self.testloader:
-            result = Counter(targets.tolist())
-            for label, val in result.items():
-                label_count[label] += val
-        self.logger.log(f"test loader has been prepared in cuda:0 ; {label_count}")
+        self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=self.args['t_batch_size'],
+                                     shuffle=False, pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
+                                     persistent_workers=True, pin_memory_device='cuda:0',prefetch_factor = 8)
+
 
         self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "train")
         self.train_sampler = CustomSampler(list(range(len(self.trainset))))
         self.trainloader = DataLoader(Subset(self.trainset, list(range(len(self.trainset)))), self.args["batch_size"],
-                                      pin_memory=True, num_workers=8,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device='cuda:0')
-        label_count = defaultdict(int)
-        for inputs, targets in self.trainloader:
-            result = Counter(targets.tolist())
-            for label, val in result.items():
-                label_count[label] += val
-        self.logger.log(f"train loader has been prepared in cuda:0 ; {label_count}")
+                                      pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
+                                      sampler=self.train_sampler, pin_memory_device='cuda:0',prefetch_factor = 8)
+
 
         # TODO------------------------优化器和学习率调整器----------------------------------
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.args["lr"],
@@ -188,6 +185,7 @@ class FedAvgServer:
             modified_client_instance = self.client_to_server.get()
             assert modified_client_instance.client_id in self.current_selected_client_ids
             client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
+            del modified_client_instance.model_dict
             client_model_cache.append(client_model)
             weight_cache.append(modified_client_instance.train_set_len)
             client_training_time.append(round(modified_client_instance.training_time * 10.0))

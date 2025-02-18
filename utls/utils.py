@@ -129,8 +129,6 @@ def evaluate(
     model.eval()
     correct = 0
     total = 0
-    all_y = []
-    all_pred = []
 
     for inputs, targets in dataloader:
         if isinstance(inputs,torch.Tensor):
@@ -142,8 +140,6 @@ def evaluate(
         pred = torch.argmax(outputs, -1)
         correct += (pred == targets).sum().item()
         total += targets.size(0)
-        all_y.extend(targets)
-        all_pred.extend(pred)
     accuracy = 100. * correct / total
     return accuracy
 
