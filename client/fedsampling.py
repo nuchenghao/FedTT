@@ -25,8 +25,8 @@ class fedsamplingClient(BaseClient):
     def __init__(self, client_id, train_index, batch_size):
         super().__init__(client_id, train_index, batch_size)
         
-    def set_estimator(self , M):
-        self.estimator = Estimator(M,0.5,self.train_set_len)
+    def set_estimator(self , M, alpha):
+        self.estimator = Estimator(M,alpha,self.train_set_len)
 
 
 
@@ -38,7 +38,7 @@ class fedsamplingTrainer(FedAvgTrainer):
     
     def load_dataset(self):
         # 对于每个 candidate_sample，生成一个独立的随机结果，表示在一次试验中成功的概率为 KN
-        choosed = np.random.binomial(size=(self.current_client.train_set_len,), n=1, p=self.synchronization['KN'])
+        choosed = np.random.binomial(size=(self.current_client.train_set_len,), n=1, p=min(1.0,self.synchronization['KN']))
         candidate_set_index=np.array(self.current_client.train_set_index)
         participate_set_index = candidate_set_index[choosed == 1].tolist()
         self.current_client.selected_data_num=len(participate_set_index)

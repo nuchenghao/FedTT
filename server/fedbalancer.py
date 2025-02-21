@@ -44,8 +44,8 @@ class fedbalancer(FedAvgServer):
         self.trainset = NeedIndexDataset(self.trainset)
         self.train_sampler = self.trainset.sampler
         self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
-                                      pin_memory=True, num_workers=8, collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device='cuda:0')
+                                      pin_memory=True, num_workers=4, collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],persistent_workers=True,
+                                      sampler=self.train_sampler, pin_memory_device='cuda:0',prefetch_factor = 8)
         self.cuda_0_trainer.trainloader = self.trainloader
 
         self.current_global_epoch = 0 # 已完成的次数
@@ -55,7 +55,7 @@ class fedbalancer(FedAvgServer):
         self.ddl_R = 0.0
         self.lt = 0.0
         self.U = []
-        self.w = 10
+        self.w = 5
         self.lss =0.05
         self.dss = 0.05
 
@@ -71,7 +71,7 @@ class fedbalancer(FedAvgServer):
         start=torch.cuda.Event(enable_timing=True)
         end=torch.cuda.Event(enable_timing=True)
         train_time = []
-        for _ in range(2):
+        for _ in range(1):
             start.record()
             for inputs, targets in self.trainloader:
                 if isinstance(inputs,torch.Tensor):
@@ -158,6 +158,7 @@ class fedbalancer(FedAvgServer):
             assert modified_client_instance.client_id in self.current_selected_client_ids
             client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
             client_model_cache.append(client_model)
+            del modified_client_instance.model_dict
             weight_cache.append(len(modified_client_instance.selected_data_index))
             LLow.append(modified_client_instance.metadata['llow'])
             LHigh.append(modified_client_instance.metadata['lhigh'])

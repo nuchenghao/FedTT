@@ -25,4 +25,4 @@ save_log: 1 # Non-zero value for saving algorithm running log
 wandb: 1
 project: "biRNN_snli_166666_dir_3"
 experiment_name: "fedsampling"
-KN: 1
+KN: 0.3

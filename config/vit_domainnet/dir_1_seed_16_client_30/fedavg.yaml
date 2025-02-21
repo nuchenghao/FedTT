@@ -10,8 +10,8 @@ client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
 global_epoch: 80
 local_epoch: 1
-batch_size: 128 # Data batch size for client local training.
-t_batch_size: 256
+batch_size: 64 # Data batch size for client local training.
+t_batch_size: 512
 client_eval: False
 
 lr: 0.01 # Learning rate for client local training.
@@ -23,5 +23,5 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "vit_domainnet_16_dir_3"
+project: "vit_domainnet_16_dir_1"
 experiment_name: "fedavg"

@@ -44,8 +44,8 @@ class ODEServer(FedAvgServer):
         self.trainset = NeedIndexDataset(self.trainset)
         self.train_sampler = self.trainset.sampler
         self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
-                                      pin_memory=True, num_workers=8, collate_fn = DATASETS_COLLATE_FN[self.args['dataset']] , persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device='cuda:0')
+                                      pin_memory=True, num_workers=4, collate_fn = DATASETS_COLLATE_FN[self.args['dataset']] , persistent_workers=True,
+                                      sampler=self.train_sampler, pin_memory_device='cuda:0',prefetch_factor = 8)
         self.cuda_0_trainer.trainloader = self.trainloader
 
 
@@ -59,7 +59,7 @@ class ODEServer(FedAvgServer):
 
         self.set_client_label() # 设定client的训练索引对应的标签
 
-        self.clients_per_label = self.client_num * self.args['labels_per_client'] # 每个标签都会分配给所有客户
+        self.clients_per_label = self.client_num  # 每个标签都会分配给所有客户
         self.labels_per_client = self.data_num_classes * self.args['labels_per_client'] # 每个client拥有的类别数
 
         self.coordinate()
@@ -171,8 +171,10 @@ class ODEServer(FedAvgServer):
         for client_id in tqdm(self.current_selected_client_ids):
             self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict())
             self.cuda_0_trainer.update_client_buffer(self.client_instances[client_id],self.global_gradient,self.args["update_batch_size"])
+            del self.client_instances[client_id].model_dict
             # self.logger.log(self.client_instances[client_id].train_set_len,len(self.client_instances[client_id].train_set_index))
-            
+        del self.global_gradient
+        torch.cuda.empty_cache() # 释放缓存 
 
     def train_one_round(self,global_round):
         self.calculate_global_grad() # 计算全局梯度
@@ -182,9 +184,7 @@ class ODEServer(FedAvgServer):
         client_training_time = []
         trainer_synchronization = {"round":global_round}
         for client_id in self.current_selected_client_ids:
-            assert self.client_instances[client_id].client_id == client_id
             self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict())
-        for client_id in self.current_selected_client_ids:
             modified_client_instance = self.cuda_0_trainer.start(
                 self.client_instances[client_id],
                 self.optimizer.state_dict(),
@@ -196,14 +196,14 @@ class ODEServer(FedAvgServer):
                 f"The pretrained acc is {modified_client_instance.pretrained_accuracy:.3f}%. The local accuracy is {modified_client_instance.accuracy:.3f}%.",
                 f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}.")
             self.client_to_server.put(modified_client_instance)
+            client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
+            client_model_cache.append(client_model)
+            del modified_client_instance.model_dict
         assert self.client_to_server.qsize() == len(self.current_selected_client_ids)
         while not self.client_to_server.empty():
             modified_client_instance = self.client_to_server.get()
             assert modified_client_instance.client_id in self.current_selected_client_ids
-            client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
-            client_model_cache.append(client_model)
             weight_cache.append(modified_client_instance.new_weight4aggregation)
-
             client_training_time.append(round(modified_client_instance.training_time * 10.0))
             self.client_instances[modified_client_instance.client_id] = modified_client_instance  # 更新client信息
 

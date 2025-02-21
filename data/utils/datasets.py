@@ -275,7 +275,7 @@ def collate_pad_double(data_points):
 
 
 imgsize = 224
-def read_domainnet(dataset_path ,split ,selected_classes, selected_domain=["clipart","painting","sketch","real"]):
+def read_domainnet(dataset_path ,split ,selected_classes, selected_domain=["clipart","painting","sketch","real","quickdraw","infograph"]):
     """
     dataset_path：指向domainnet文件夹所在位置
     selected_domain：选中的域
@@ -297,7 +297,7 @@ def read_domainnet(dataset_path ,split ,selected_classes, selected_domain=["clip
     return data_paths, data_labels
 
 class DomainNet(Dataset):
-    def __init__(self, root , which, selected_classes = 200):
+    def __init__(self, root , which, selected_classes = 150):
         super(DomainNet, self).__init__()
         self.data_paths,self.targets = read_domainnet(root, which, selected_classes)
         self.classes = list(range(selected_classes))
@@ -332,7 +332,7 @@ DATA_NUM_CLASSES_DICT: Dict[str, int] = {
     "cinic10": 10,
     "cifar100": 100,
     "snli": 3,
-    "domainnet": 200
+    "domainnet": 150
 }
 
 DATASETS_COLLATE_FN ={
@@ -376,8 +376,8 @@ DATA_TRANSFORMS = {
             antialias=False,
             ),
         transforms.Normalize(
-          [0.6605686,0.6431999,0.61347884],
-          [0.33127954, 0.32900678, 0.34953416]),
+            [0.48145466, 0.4578275, 0.40821073],
+            [0.26862954, 0.26130258, 0.27577711]),
         ]),
         "test": transforms.Compose([
         transforms.ToTensor(),
@@ -387,8 +387,8 @@ DATA_TRANSFORMS = {
             antialias=False,
             ),
         transforms.Normalize(
-          [0.6605686,0.6431999,0.61347884],
-          [0.33127954, 0.32900678, 0.34953416]),
+            [0.48145466, 0.4578275, 0.40821073],
+            [0.26862954, 0.26130258, 0.27577711]),
         ])
     }
 }

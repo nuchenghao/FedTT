@@ -73,8 +73,8 @@ class FedCaSeServer(FedAvgServer):
         self.trainset = FedCaseDataset(self.trainset)
         self.train_sampler = self.trainset.sampler
         self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
-                                      pin_memory=True, num_workers=8 , collate_fn = DATASETS_COLLATE_FN[self.args['dataset']] , persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device='cuda:0')
+                                      pin_memory=True, num_workers=4 , collate_fn = DATASETS_COLLATE_FN[self.args['dataset']] , persistent_workers=True,
+                                      sampler=self.train_sampler, pin_memory_device='cuda:0',prefetch_factor = 8)
         self.cuda_0_trainer.trainloader = self.trainloader
 
     def train_one_round(self,global_round):
@@ -103,6 +103,7 @@ class FedCaSeServer(FedAvgServer):
             assert modified_client_instance.client_id in self.current_selected_client_ids
             client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
             client_model_cache.append(client_model)
+            del modified_client_instance.model_dict
             weight_cache.append(modified_client_instance.train_set_len)
             client_training_time.append(round(modified_client_instance.training_time * 10.0))
             self.client_instances[modified_client_instance.client_id] = modified_client_instance  # 更新client信息

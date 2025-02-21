@@ -51,7 +51,7 @@ class ODETrainer(FedAvgTrainer):
         self.current_client = client_instance
         self.model.load_state_dict(self.current_client.model_dict)
         self.trainloader.sampler.set_index(self.current_client.train_set_index)  # 在里面实现了深拷贝
-        self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
+        self.trainloader.batch_sampler.batch_size = self.current_client.batch_size if self.args['model'] != "vit" else int(self.current_client.batch_size // 2)
         self.model.train()
 
         # 特殊层需要特殊处理----------
@@ -59,8 +59,13 @@ class ODETrainer(FedAvgTrainer):
         for module in self.model.modules():
             if isinstance(module,__NormBase):
                 module.track_running_stats = False # 取消BN层的mean、var跟踪
-
-        trainable_parameters = [p for p in self.model.parameters()]# 获得可学习的参数，构成一个list 
+        if self.args['model'] != "vit":
+            trainable_parameters = [p for p in self.model.parameters()]# 获得可学习的参数，构成一个list 
+        else:
+            trainable_parameters = []
+            for name, param in self.model.named_parameters():
+                if 'head' in name or 'lora' in name or 'Prompt' in name:
+                    trainable_parameters.append(param)
         cnt = 0
         gradient = [] # list[(torch.tensor, ... ,torch.tensor)]
         self.optimizer.zero_grad() # 优化器并没有使用任何的状态存储信息，因此可以复用
@@ -108,19 +113,28 @@ class ODETrainer(FedAvgTrainer):
             if isinstance(module,__NormBase):
                 module.track_running_stats = False # 取消BN层的mean、var跟踪
         params = dict(self.model.named_parameters())
-        trainable_parameters = [p for p in self.model.parameters()]# 获得可学习的参数，构成一个list 
+        if self.args['model'] != "vit":
+            trainable_parameters = [p for p in self.model.parameters()]# 获得可学习的参数，构成一个list 
+        else:
+            trainable_parameters = []
+            for name, param in self.model.named_parameters():
+                if 'head' in name or 'lora' in name or 'Prompt' in name:
+                    trainable_parameters.append(param)
 
         for inputs,targets in self.trainloader:
             result=torch.zeros(len(targets),dtype=torch.float32,device=self.device)
-            if isinstance(inputs,torch.Tensor):
+            if isinstance(inputs,torch.Tensor) and self.args['model'] != "vit":
                 inputs = inputs.to(self.device, non_blocking=True)
                 targets = targets.to(self.device,non_blocking=True)
-                gradients: dict[str:torch.tensor] = vmap(grad(self.loss_fn), in_dims=(None, 0, 0))(params, inputs, targets)
+                gradients: dict[str:torch.tensor] = vmap(grad(self.loss_fn), in_dims=(None, 0, 0),randomness='same')(params, inputs, targets)
                 for local_grad,global_grad in zip(gradients.values(),global_gradient):
                     result += torch.sum(local_grad * global_grad,dim=tuple(range(1,local_grad.ndim)))#local_grad要比global高一维
             else:
                 self.optimizer.zero_grad()
-                inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
+                if isinstance(inputs,torch.Tensor):
+                    inputs = inputs.to(self.device, non_blocking=True)
+                else:
+                    inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
                 targets = targets.to(self.device,non_blocking=True)
                 outputs = self.model(inputs)
                 loss = self.criterion_(outputs, targets).mean()
@@ -129,6 +143,8 @@ class ODETrainer(FedAvgTrainer):
                 for local_grad,global_grad in zip(_grad,global_gradient):
                     result += torch.sum(local_grad * global_grad)#local_grad要比global高一维
             self.trainloader.dataset.update(result)
+            del result,_grad
+        del trainable_parameters
         value:np.array = self.trainloader.dataset.get_value(self.current_client.train_set_index)
         self.current_client.buffer_idx = []
         for label in self.current_client.label_weight.keys():
