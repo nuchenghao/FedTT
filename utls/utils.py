@@ -129,7 +129,8 @@ def evaluate(
     model.eval()
     correct = 0
     total = 0
-
+    criterion = torch.nn.CrossEntropyLoss(reduction='none').to(device)
+    total_loss = 0.0
     for inputs, targets in dataloader:
         if isinstance(inputs,torch.Tensor):
             inputs = inputs.to(device, non_blocking=True)
@@ -137,11 +138,12 @@ def evaluate(
             inputs = [tensor.to(device, non_blocking=True) for tensor in inputs]
         targets = targets.to(device,non_blocking=True)
         outputs = model(inputs)
+        total_loss += criterion(outputs, targets).sum().item()
         pred = torch.argmax(outputs, -1)
         correct += (pred == targets).sum().item()
         total += targets.size(0)
     accuracy = 100. * correct / total
-    return accuracy
+    return accuracy , total_loss
 
 
 def count_labels(

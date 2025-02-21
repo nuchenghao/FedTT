@@ -151,7 +151,7 @@ class FedAvgServer:
             self.logger.log(f"current selected clients: {self.current_selected_client_ids}")
             training_time = self.train_one_round( E + 1 )
             self.current_time += training_time
-            accuracy = evaluate(torch.device("cuda:0"), self.model, self.testloader)
+            accuracy,loss = evaluate(torch.device("cuda:0"), self.model, self.testloader)
             self.logger.log(f"Finished training!!! Current global epoch training time: {training_time}.",
                             f"The global time is {self.current_time}",
                             f"The Global model accuracy is {accuracy:.3f}%.")
