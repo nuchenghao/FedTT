@@ -1,10 +1,10 @@
-algorithm: fedavg
+algorithm: ODE
 model: vit # resnet18、
 dataset: domainnet #cinic10、
 
 
 set_seed: True # True为设置种子，False为性能测试
-seed: 16 # 注意修改data中的seed;
+seed: 166666 # 注意修改data中的seed;
 
 client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
@@ -13,6 +13,7 @@ local_epoch: 1
 batch_size: 64 # Data batch size for client local training.
 t_batch_size: 512
 client_eval: False
+
 
 lr: 0.01 # Learning rate for client local training.
 momentum: 0.0 # Momentum for client local opitimizer.
@@ -23,5 +24,8 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "vit_domainnet_16_dir_1"
-experiment_name: "fedavg"
+project: "vit_domainnet_166666_dir_1"
+experiment_name: "ODE"
+
+labels_per_client: 0.8
+update_batch_size: 32

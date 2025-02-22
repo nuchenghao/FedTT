@@ -849,8 +849,9 @@ python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_se
 
 # python3 -u ./server/fedavg.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/fedavg.yaml
 
-
 # python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/classify_dynamic_batch_r3_s1.yaml
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/loss_dynamic_batch_global_loss_r3_s1.yaml
+
 
 # python3 -u ./server/fedbalancer.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/fedbalancer.yaml
 
@@ -862,3 +863,109 @@ python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_se
 
 
 # python3 -u ./server/ODE.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/ode.yaml
+
+
+
+
+
+
+
+# ------------------ seed 166 ---------------------------
+
+# python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/data.yaml
+
+# python3 -u ./server/fedavg.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/fedavg.yaml
+
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/classify_dynamic_batch_r3_s1.yaml
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/loss_dynamic_batch_global_loss_r3_s1.yaml
+
+
+# python3 -u ./server/fedbalancer.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/fedbalancer.yaml
+
+
+# python3 -u ./server/fedcase.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/fedcase.yaml
+
+
+# python3 -u ./server/fedsampling.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/fedsampling.yaml
+
+
+# python3 -u ./server/ODE.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/ode.yaml
+
+
+
+
+
+
+# ------------------ seed 1666 ---------------------------
+
+# python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/data.yaml
+
+# python3 -u ./server/fedavg.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/fedavg.yaml
+
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/classify_dynamic_batch_r3_s1.yaml
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/loss_dynamic_batch_global_loss_r3_s1.yaml
+
+
+# python3 -u ./server/fedbalancer.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/fedbalancer.yaml
+
+
+# python3 -u ./server/fedcase.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/fedcase.yaml
+
+
+# python3 -u ./server/fedsampling.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/fedsampling.yaml
+
+
+# python3 -u ./server/ODE.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/ode.yaml
+
+
+
+
+
+
+# ------------------ seed 16666 ---------------------------
+
+# python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/data.yaml
+
+# python3 -u ./server/fedavg.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/fedavg.yaml
+
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/classify_dynamic_batch_r3_s1.yaml
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/loss_dynamic_batch_global_loss_r3_s1.yaml
+
+
+# python3 -u ./server/fedbalancer.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/fedbalancer.yaml
+
+
+# python3 -u ./server/fedcase.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/fedcase.yaml
+
+
+# python3 -u ./server/fedsampling.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/fedsampling.yaml
+
+
+# python3 -u ./server/ODE.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/ode.yaml
+
+
+
+
+
+
+
+# ------------------ seed 166666 ---------------------------
+
+# python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/data.yaml
+
+# python3 -u ./server/fedavg.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/fedavg.yaml
+
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/classify_dynamic_batch_r3_s1.yaml
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/loss_dynamic_batch_global_loss_r3_s1.yaml
+
+
+# python3 -u ./server/fedbalancer.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/fedbalancer.yaml
+
+
+# python3 -u ./server/fedcase.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/fedcase.yaml
+
+
+# python3 -u ./server/fedsampling.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/fedsampling.yaml
+
+
+# python3 -u ./server/ODE.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/ode.yaml
