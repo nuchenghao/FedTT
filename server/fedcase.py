@@ -83,8 +83,8 @@ class FedCaSeServer(FedAvgServer):
         self.delta_l , self.delta_d = [] , []
         self.P = []
         self.l_min ,self.l_max,self.d_min , self.d_max = 1e8 , -1e8 , 1e8 , -1e8
-        self.alpha = 0.4
-        self.beta = 0.6
+        self.alpha = 0.1
+        self.beta = 0.9
         self.prev_l = 0.0
         self.prev_t = 0.0
         self.regression_model = RandomForestRegressor(n_estimators=100, random_state=42)
@@ -94,13 +94,13 @@ class FedCaSeServer(FedAvgServer):
 
         for client_id in self.current_selected_client_ids : # 这时的current_selected_client_ids还等于上一轮的
             client_time = self.client_instances[client_id].training_time
-            client_loss = self.trainloader.dataset.get_value(self.client_instances[client_id].train_set_index).sum()
+            client_loss = self.trainloader.dataset.get_value(self.client_instances[client_id].train_set_index).sum() / len(self.client_instances[client_id].train_set_index)
             D.append(client_time)
             L.append(client_loss)
             self.l_min , self.l_max = min(self.l_min,client_loss) , max(self.l_max , client_loss)
             self.d_min , self.d_max = min(self.d_min,client_time) , max(self.d_max , client_time)
-            cm = (client_loss - self.l_min) / ((self.l_max - self.l_min) if self.l_max != self.l_min else 1.0)
-            ci = (self.d_max - client_time) / ((self.d_max - self.d_min) if self.d_max != self.d_min else 1.0)
+            cm = (client_loss - self.l_min) / (self.l_max - self.l_min) if self.l_max != self.l_min else 0.0
+            ci = (self.d_max - client_time) / (self.d_max - self.d_min) if self.d_max != self.d_min else 0.0
             client_experience = self.alpha * ci + self.beta * cm
             self.F[client_id] = client_experience
         return max(D) 
@@ -120,6 +120,7 @@ class FedCaSeServer(FedAvgServer):
         prev_ratio_array= np.array(self.P)
         self.regression_model = RandomForestRegressor(n_estimators=100, random_state=42)
         self.regression_model.fit(np.hstack((loss_diff_array, time_diff_array, rate_loss_diff_array)), prev_ratio_array)
+
         new_point = np.array([[T_l, T_D, T_l / T_D]])
         rho = self.regression_model.predict(new_point)[0]
         return rho
