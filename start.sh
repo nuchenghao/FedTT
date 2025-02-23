@@ -322,11 +322,11 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 
 # python3 -u ./server/fedbalancer.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedbalancer.yaml
 
-# python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedsampling.yaml
+python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedsampling.yaml
 
 # python3 -u ./server/ODE.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/ode.yaml
 
-python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase.yaml
+# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_5_seed_16_client_30/fedcase.yaml
 
 
 

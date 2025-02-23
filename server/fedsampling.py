@@ -49,6 +49,11 @@ class fedsampling(FedAvgServer):
         hat_N = max(self.client_num,(R-self.client_num*(1-self.alpha)*self.M/2)/self.alpha)*self.args['client_join_ratio']
 
 
+        # hat_N = 0 
+        # for client_id in self.current_selected_client_ids:
+        #     hat_N += self.client_instances[client_id].train_set_len
+        # self.K = hat_N * self.args["KN"]
+
         trainer_synchronization = {"round" : global_round ,'KN': self.K / hat_N , "K" : self.K}
         print(f"R:{R} K:{self.K} N_hat:{hat_N} the ratio is {self.K / hat_N}")
         for client_id in self.current_selected_client_ids:
