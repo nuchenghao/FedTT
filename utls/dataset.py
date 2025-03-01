@@ -11,10 +11,12 @@ import warnings
 class CustomSampler(Sampler):
     def __init__(self, indices):
         super(CustomSampler, self).__init__()
+        assert isinstance(indices, torch.Tensor) == False , "the type of indices cannot be torch.Tensor"
         random.shuffle(indices)
         self.indices = indices
 
     def set_index(self, indices, epoch=1):
+        assert isinstance(indices, torch.Tensor) == False , "the type of indices cannot be torch.Tensor"
         train_index = []
         for _ in range(epoch):
             copyed_indices = copy.deepcopy(indices)
@@ -23,7 +25,9 @@ class CustomSampler(Sampler):
         self.indices = train_index
 
     def __iter__(self):
-        # 返回索引的迭代器
+        # 返回索引的迭代器；这里每次需要先shuffle一次；注意：random.shuffle只能作用在list和np.array中；不能作用在torch.tensor中，会出错
+        assert isinstance(self.indices, torch.Tensor) == False , "the type of indices cannot be torch.Tensor"
+        random.shuffle(self.indices)
         return iter(self.indices)
 
     def __len__(self):
@@ -104,6 +108,7 @@ class NeedIndexSampler(Sampler):
     def __init__(self, dataset : NeedIndexDataset , sample_indices : np.array):
         super().__init__()
         self.dataset = dataset
+        assert isinstance(sample_indices, torch.Tensor) == False , "the type of sample_indices cannot be torch.Tensor"
         self.sample_indices = sample_indices # 存储当前样本的索引，值为索引
         self.iter_obj = None # 用于迭代样本索引的迭代器
         self.reset()  # 在初始化时重置采样器的状态
@@ -112,10 +117,11 @@ class NeedIndexSampler(Sampler):
         return self.sample_indices[idx]
 
     def reset(self):
-        shuffled_sample_indices = np.random.permutation(self.sample_indices) # 将索引打散，返回一个全新的数组
-        self.iter_obj = iter(shuffled_sample_indices)  # 将 sample_indices 转换为迭代器 iter_obj。
+        np.random.shuffle(self.sample_indices) # 将索引打散，返回一个全新的数组
+        self.iter_obj = iter(self.sample_indices)  # 将 sample_indices 转换为迭代器 iter_obj。
 
     def set_index(self , sample_indices):
+        assert isinstance(sample_indices, torch.Tensor) == False , "the type of sample_indices cannot be torch.Tensor"
         self.sample_indices = copy.deepcopy(sample_indices)
         self.reset()
 

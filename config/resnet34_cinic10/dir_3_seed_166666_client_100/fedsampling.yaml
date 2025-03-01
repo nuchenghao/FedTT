@@ -25,4 +25,4 @@ save_log: 1 # Non-zero value for saving algorithm running log
 wandb: 1
 project: "resnet34_cinic10_166666_dir_3"
 experiment_name: "fedsampling"
-KN: 0.2
+KN: 0.8
