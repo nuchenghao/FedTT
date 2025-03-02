@@ -1,0 +1,22 @@
+algorithm: centralized
+model: resnet50 
+dataset: cifar100 
+
+
+set_seed: True # True为设置种子，False为性能测试
+seed: 16666 # 注意修改data中的seed;
+
+
+global_epoch: 150
+batch_size: 96 # Data batch size for client local training.
+t_batch_size: 2048
+
+lr: 0.01 # Learning rate for client local training.
+momentum: 0.0 # Momentum for client local opitimizer.
+weight_decay: 0.0 # Weight decay for client local optimizer.
+
+
+# wandb记录
+wandb: 1
+project: "resnet50_cifar100_16666_dir_3"
+experiment_name: "centralized training"
