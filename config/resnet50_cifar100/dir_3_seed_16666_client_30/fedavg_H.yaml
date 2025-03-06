@@ -1,16 +1,16 @@
-algorithm: fedsampling
+algorithm: fedavg
 model: resnet50 # resnet18、
 dataset: cifar100 #cinic10、
 
 
 set_seed: True # True为设置种子，False为性能测试
-seed: 166 # 注意修改data中的seed;
+seed: 16666 # 注意修改data中的seed;
 
 client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 1200 
-local_epoch: 1
-batch_size: 96 # Data batch size for client local training.
+global_epoch: 300
+local_epoch: 4
+batch_size: 48 # Data batch size for client local training.
 t_batch_size: 2048
 client_eval: False
 
@@ -23,6 +23,5 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "resnet50_cifar100_166_dir_3"
-experiment_name: "fedsampling"
-KN: 0.8
+project: "resnet50_cifar100_16666_dir_3"
+experiment_name: "fedavg_H"

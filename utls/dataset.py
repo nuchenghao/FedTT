@@ -80,8 +80,8 @@ class NeedIndexDataset(Dataset):
 
 
     def update(self , values , loss_ = True):
-        assert len(self.cur_batch_index) == batch_size and isinstance(values, torch.Tensor)
         batch_size = values.shape[0]
+        assert len(self.cur_batch_index) == batch_size and isinstance(values, torch.Tensor)
         weight = self.weight[self.cur_batch_index].to("cuda:0")
         value_val = values.detach().clone()
         self.value[self.cur_batch_index] = value_val.cpu()
