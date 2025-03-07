@@ -190,7 +190,7 @@ class clientsocket:
         self.sock.setblocking(False)
         self.sock.connect_ex((self.server_ip,self.server_port)) # 创建一个连接
 
-def create_content(name, action, value):  # 这个就是上传的内容格式
+def create_content(name, action):  # 这个就是上传的内容格式
 
     return dict(name=name,
                 action=action)
@@ -211,13 +211,13 @@ def send_2_server(client):
         content_client_2_server = client.need_to_send_queue.get()
     event = multiprocessing.Event()
     multiprocessing_shared_queue = multiprocessing.Queue()
-    write_thread = MyThread(client, event, multiprocessing_shared_queue)
+    write_thread = MyThread( event, multiprocessing_shared_queue)
     write_process = WriteProcess(client.socket_manager.sock, content_client_2_server,print_lock,event,multiprocessing_shared_queue)
     write_thread.start()
     write_process.start()
-    read_thread = ReadThread()
-    read_thread.start()
-    read_thread.join()
+    # read_thread = ReadThread()
+    # read_thread.start()
+    # read_thread.join()
 
 
 
@@ -226,6 +226,9 @@ def register(client):
     content_client_2_server = create_content(client.name,"register")
     client.need_to_send_queue.put(content_client_2_server)
     send_2_server(client)
+    while True:
+        if client.socket_in_use == False:
+            break
 
 
 if __name__ == '__main__':

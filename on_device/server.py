@@ -75,11 +75,15 @@ class MyThread(threading.Thread):  # 每个线程与一个进程对应
             with self.server_lock:
                 physical_device = server.all_physical_device_queue[physical_device_id]
                 assert physical_device.physical_device_id == physical_device_id, f"the physical device id {physical_device_id} is not equal to physical_device.physical_device_id {physical_device.physical_device_id}"
-                physical_device.name = value
+                physical_device.name = value # 在子线程中进行修改，不能在子进程中修改
                 server.wait_queue.put("register")
                 server.current_state = 'registered' if server.wait_queue.qsize() == server.need_connect_device else None
-        elif option == "finishUpload":
-            pass
+        elif option == "distributed":
+            with self.server_lock:
+                physical_device = server.all_physical_device_queue[physical_device_id]
+                assert physical_device.physical_device_id == physical_device_id, f"the physical device id {physical_device_id} is not equal to physical_device.physical_device_id {physical_device.physical_device_id}"
+                server.wait_queue.put("distributed")
+                server.current_state = 'registered' if server.wait_queue.qsize() == server.need_connect_device else None
         elif option == "finishDownload":  # 下发完成
             pass
 
@@ -161,15 +165,14 @@ class ReadProcess(multiprocessing.Process):
 
 
 class WriteProcess(multiprocessing.Process):
-    def __init__(self, message, printLock, console, event, multiprocessingSharedQueue, finished):
+    def __init__(self, content_server_2_client, physical_device, print_lock, event, multiprocessing_shared_queue):
         super().__init__()
-        self.message = message
-        self.printLock = printLock
-        self.console = console
+        self.content_server_2_client = content_server_2_client
+        self.physical_device = physical_device
+        self.print_lock = print_lock
         self.event = event
-        self.multiprocessingSharedQueue = multiprocessingSharedQueue  # 共享队列
+        self.multiprocessing_shared_queue = multiprocessing_shared_queue  # 共享队列
         self._send_buffer = b""  # 写缓冲区
-        self.finished = finished  # 是否训练结束
 
     def _create_message(
             self, content
@@ -183,32 +186,28 @@ class WriteProcess(multiprocessing.Process):
         return message
 
     def _create_response(self):
-        if self.finished:  # 训练结束
-            response = dict(finished=self.finished, content="")
-        else:
-            response = dict(finished=self.finished, content=self.message.content)
-        response = encode(response)
+        response = encode(self.content_server_2_client)
         return response
 
     def run(self):
         with self.printLock:
-            console.info(f"start sending to {self.message.name} whose messageId is {self.message.messageId}")
+            console.info(f"start sending to {self.physical_device.name} whose messageId is {self.physical_device.physical_device_id}")
         response = self._create_response()
         message = self._create_message(response)  # 加两个头文件
         self._send_buffer += message
         while True:
             if self._send_buffer:
                 try:
-                    sent = self.message.sock.send(self._send_buffer)
+                    sent = self.physical_device.sock.send(self._send_buffer)
                 except BlockingIOError:
                     pass
                 else:
                     self._send_buffer = self._send_buffer[sent:]
             else:
                 break
-        self.multiprocessingSharedQueue.put(("finishDownload", self.message.messageId, ""))
+        self.multiprocessing_shared_queue.put(("distributed", self.physical_device.physical_device_id, self.physical_device.name, ""))
         with self.printLock:
-            console.info(f"Sent to {self.message.name} whose messageId is {self.message.messageId}")
+            console.info(f"Sent to {self.physical_device.name} whose messageId is {self.physical_device.physical_device_id}")
         self.event.set()
 
 
@@ -216,7 +215,6 @@ class WriteProcess(multiprocessing.Process):
 
 class Server:
     def __init__(self,need_connect_device, tot_client_nums, total_epoches, socket_manager):
-        self.current_connect_device = 0
         self.need_connect_device = need_connect_device
         self.current_client_nums = 0
         self.tot_client_nums = tot_client_nums
