@@ -129,10 +129,10 @@ class ReadProcess(multiprocessing.Process):
         self.request = decode(data)
 
         if self.request.get('action') == 'register':
-            self.name = self.request.get('name')
+            name = self.request.get('name')
             with self.printLock:
-                console.log(f"Received {self.name} register request", style="bold yellow")
-            self.multiprocessing_shared_queue.put(("one register", self.physical_device.physical_device_id, self.name, self.request))  # 返回给server修改,第2个参数表示对应的message
+                console.log(f"Received {name} register request", style="bold yellow")
+            self.multiprocessing_shared_queue.put(("one register", self.physical_device.physical_device_id, name, self.request))  # 返回给server修改,第2个参数表示对应的message
 
         elif self.request.get('action') == 'upload':
             pass
@@ -216,6 +216,7 @@ class WriteProcess(multiprocessing.Process):
 
 class Server:
     def __init__(self,need_connect_device, tot_client_nums, total_epoches, socket_manager):
+        self.current_connect_device = 0
         self.need_connect_device = need_connect_device
         self.current_client_nums = 0
         self.tot_client_nums = tot_client_nums
@@ -257,9 +258,9 @@ class physicalDevice:
 
 
 class serversocket():
-    def __init__(self,):
-        self.server_ip = "172.18.101.107"
-        self.server_port = 65432
+    def __init__(self,server_ip, server_port):
+        self.server_ip = server_ip
+        self.server_port = server_port
         self.sel = selectors.DefaultSelector()
         self.lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # Avoid bind() exception: OSError: [Errno 48] Address already in use
@@ -314,7 +315,7 @@ if __name__ == '__main__':
         args = yaml.safe_load(file)
     if args["set_seed"]:
         fix_random_seed(args["seed"])
-    socket_manager = serversocket()
+    socket_manager = serversocket(args['server_ip'],args['server_port'])
     server = Server(args['need_connect_device'], args['client_num'], args['global_epoch'], socket_manager)
     registerStage(server)
     for physical_device in server.all_physical_device_queue:

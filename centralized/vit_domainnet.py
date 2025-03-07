@@ -54,6 +54,11 @@ if __name__=='__main__':
     testloader = DataLoader(testset, batch_size=512, shuffle=False, pin_memory=True, num_workers=8,
                         persistent_workers=True, pin_memory_device='cuda:0')
     model = MODEL_DICT[args["model"]](DATA_NUM_CLASSES_DICT[args['dataset']]).to('cuda:0')
+    for name, param in model.named_parameters():
+        if 'head' in name or 'lora' in name or 'Prompt' in name:
+            param.requires_grad_(True)
+        else:
+            param.requires_grad_(False)
     optimizer = torch.optim.SGD(model.parameters(), lr=args["lr"],
                                          momentum=args["momentum"], weight_decay=args["weight_decay"])
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to('cuda:0')

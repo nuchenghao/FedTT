@@ -183,9 +183,9 @@ class WriteProcess(multiprocessing.Process):
 
 
 class clientsocket:
-    def __init__(self):
-        self.server_ip = "172.18.101.107"
-        self.server_port = 65432
+    def __init__(self, server_ip, server_port):
+        self.server_ip = server_ip
+        self.server_port = server_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
         self.sock.connect_ex((self.server_ip,self.server_port)) # 创建一个连接
@@ -235,7 +235,7 @@ if __name__ == '__main__':
     if args["set_seed"]:
         fix_random_seed(args["seed"])
     
-    socket_manager = clientsocket()
+    socket_manager = clientsocket(args['server_ip'], args['server_port'])
     client = Client(socket_manager, parser.name)
     register(client)
     client.socket_manager.sock.close()  # 关闭socket
