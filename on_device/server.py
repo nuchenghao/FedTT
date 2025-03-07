@@ -77,13 +77,18 @@ class MyThread(threading.Thread):  # 每个线程与一个进程对应
                 assert physical_device.physical_device_id == physical_device_id, f"the physical device id {physical_device_id} is not equal to physical_device.physical_device_id {physical_device.physical_device_id}"
                 physical_device.name = value # 在子线程中进行修改，不能在子进程中修改
                 server.wait_queue.put("register")
-                server.current_state = 'registered' if server.wait_queue.qsize() == server.need_connect_device else None
+                if server.wait_queue.qsize() == server.need_connect_device:
+                    server.current_state = 'registered'
+                    server.wait_queue.queue.clear()
+
         elif option == "distributed":
             with self.server_lock:
                 physical_device = server.all_physical_device_queue[physical_device_id]
                 assert physical_device.physical_device_id == physical_device_id, f"the physical device id {physical_device_id} is not equal to physical_device.physical_device_id {physical_device.physical_device_id}"
                 server.wait_queue.put("distributed")
-                server.current_state = 'registered' if server.wait_queue.qsize() == server.need_connect_device else None
+                if server.wait_queue.qsize() == server.need_connect_device:
+                    server.current_state = 'distributed' 
+                    server.wait_queue.queue.clear()
         elif option == "finishDownload":  # 下发完成
             pass
 
@@ -134,7 +139,7 @@ class ReadProcess(multiprocessing.Process):
 
         if self.request.get('action') == 'register':
             name = self.request.get('name')
-            with self.printLock:
+            with self.print_lock:
                 console.log(f"Received {name} register request", style="bold yellow")
             self.multiprocessing_shared_queue.put(("one register", self.physical_device.physical_device_id, name, self.request))  # 返回给server修改,第2个参数表示对应的message
 
@@ -142,7 +147,7 @@ class ReadProcess(multiprocessing.Process):
             pass
 
     def run(self):
-        with self.printLock:
+        with self.print_lock:
             console.log(
                 f"start reading {self.physical_device.name}'s upload whose messageId is {self.physical_device.physical_device_id}" if self.physical_device.name != "" else "A new connection!")
         while True:
@@ -157,7 +162,7 @@ class ReadProcess(multiprocessing.Process):
                     self.process_request()
                 if self.request is not None:
                     break
-        with self.printLock:
+        with self.print_lock:
             console.log(
                 f"finish reading {self.physical_device.name}'s upload whose messageId is {self.physical_device.physical_device_id}" if self.physical_device.name != "" else "A new connection accepted!")
         self.event.set()  # 读进程完成，对应的父进程的子线程可以开始处理数据
@@ -190,8 +195,8 @@ class WriteProcess(multiprocessing.Process):
         return response
 
     def run(self):
-        with self.printLock:
-            console.info(f"start sending to {self.physical_device.name} whose messageId is {self.physical_device.physical_device_id}")
+        with self.print_lock:
+            console.log(f"start sending to {self.physical_device.name} whose messageId is {self.physical_device.physical_device_id}")
         response = self._create_response()
         message = self._create_message(response)  # 加两个头文件
         self._send_buffer += message
@@ -206,8 +211,8 @@ class WriteProcess(multiprocessing.Process):
             else:
                 break
         self.multiprocessing_shared_queue.put(("distributed", self.physical_device.physical_device_id, self.physical_device.name, ""))
-        with self.printLock:
-            console.info(f"Sent to {self.physical_device.name} whose messageId is {self.physical_device.physical_device_id}")
+        with self.print_lock:
+            console.log(f"Sent to {self.physical_device.name} whose messageId is {self.physical_device.physical_device_id}")
         self.event.set()
 
 
@@ -225,9 +230,9 @@ class Server:
 
         self.all_physical_device_queue = [] # 记录所有物理设备的队列
 
-        self.current_state = None # registered/upload/download
+        self.current_state = None # registered/distributed/download
 
-        self.wait_queue = queue.Queue()  # 多线程共享队列， 存储线程的处理结果
+        self.wait_queue = queue.Queue()  # 多线程共享队列， 存储线程的处理结果; 要注意清空
     
     def add_epoch(self):
         self.current_epoches += 1
@@ -293,7 +298,7 @@ def registerStage(server):
                         event = multiprocessing.Event()
                         multiprocessing_shared_queue = multiprocessing.Queue()
                         read_process = ReadProcess(physical_device, print_lock, event, multiprocessing_shared_queue)
-                        read_thread = MyThread(server, server_lock, event,multiprocessing_shared_queue)
+                        read_thread = MyThread( event,multiprocessing_shared_queue)
                         read_thread.start()
                         read_process.start()
 
@@ -301,6 +306,22 @@ def registerStage(server):
                 if server.current_state is not None:
                     console.log(f"all the clients has registered! The stateInServer.allClientMessageQueue is {server.all_physical_device_queue}")
                     break
+        
+        for physical_device in server.all_physical_device_queue:
+            event = multiprocessing.Event()
+            multiprocessing_shared_queue = multiprocessing.Queue()
+            write_process = WriteProcess("received your files", physical_device, print_lock,event,multiprocessing_shared_queue)
+            write_thread = MyThread(event, multiprocessing_shared_queue)
+            write_thread.start()
+            write_process.start()
+        
+        while True:
+            with server_lock:
+                if server.current_state == "distributed":
+                    console.log("distributed to all clients")
+                    break
+            
+            
 
     except Exception:
         print("Something wrong in register stage")

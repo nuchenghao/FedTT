@@ -59,7 +59,7 @@ def json_decode(json_bytes, encoding):
 
 class ReadThread(threading.Thread):
     def __init__(self):
-        super().__init__(self,)
+        super().__init__()
         global client 
         self.client = client
         self._recv_buffer = b""
@@ -102,6 +102,7 @@ class ReadThread(threading.Thread):
         self.finishedRead = True
 
     def run(self):
+        self.client.socket_in_use = True
         while True:
             self._read()
             if self._jsonheader_len is None:
@@ -119,17 +120,19 @@ class ReadThread(threading.Thread):
 class MyThread(threading.Thread):  # 每个线程与一个进程对应
     def __init__(self, event, multiprocessing_shared_queue):
         super().__init__()
-        global client
+        global client , client_lock
         self.client = client
+        self.client_lock = client_lock
         self.event = event
         self.multiprocessing_shared_queue = multiprocessing_shared_queue
 
     def run(self):
         self.event.wait()  # 等待对应的子进程完成
-        option, = self.multiprocessing_shared_queue.get()
+        option = self.multiprocessing_shared_queue.get()
         if option == "uploaded":  # 一个注册进程
-            with client_lock:
-                self.client.socket_in_use = True
+            with self.client_lock:
+                self.client.socket_in_use = False
+
             
 
 
@@ -160,7 +163,7 @@ class WriteProcess(multiprocessing.Process):
 
     def run(self):
         with self.print_lock:
-            console.info(f"start sending to server")
+            console.log(f"start sending to server")
         response = self._create_response()
         message = self._create_message(response)  # 加两个头文件
         self._send_buffer += message
@@ -174,9 +177,9 @@ class WriteProcess(multiprocessing.Process):
                     self._send_buffer = self._send_buffer[sent:]
             else:
                 break
-        self.multiprocessing_shared_queue.put(("uploaded"))
+        self.multiprocessing_shared_queue.put("uploaded")
         with self.print_lock:
-            console.info(f"send to server successfully")
+            console.log(f"send to server successfully")
         self.event.set()
 
     
@@ -200,12 +203,13 @@ class Client:
         self.socket_manager = socket_manager
         self.name = name 
 
-        self.communication_buffer = None
+        self.received_data = None
 
         self.socket_in_use = False
         self.need_to_send_queue = queue.Queue()
 
-def send_2_server(client):
+def send_2_server():
+    global client, client_lock
     with client_lock:
         client.socket_in_use = True
         content_client_2_server = client.need_to_send_queue.get()
@@ -215,20 +219,24 @@ def send_2_server(client):
     write_process = WriteProcess(client.socket_manager.sock, content_client_2_server,print_lock,event,multiprocessing_shared_queue)
     write_thread.start()
     write_process.start()
-    # read_thread = ReadThread()
-    # read_thread.start()
-    # read_thread.join()
 
 
 
 
-def register(client):
+
+def register():
+    global client, client_lock
     content_client_2_server = create_content(client.name,"register")
     client.need_to_send_queue.put(content_client_2_server)
-    send_2_server(client)
+    send_2_server()
     while True:
-        if client.socket_in_use == False:
-            break
+        with client_lock:
+            if client.socket_in_use == False:
+                break
+    read_thread = ReadThread()
+    read_thread.start()
+    read_thread.join()
+    console.log(client.received_data)
 
 
 if __name__ == '__main__':
@@ -240,5 +248,6 @@ if __name__ == '__main__':
     
     socket_manager = clientsocket(args['server_ip'], args['server_port'])
     client = Client(socket_manager, parser.name)
-    register(client)
+    register()
+
     client.socket_manager.sock.close()  # 关闭socket
