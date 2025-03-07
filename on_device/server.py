@@ -60,8 +60,9 @@ def json_decode(json_bytes, encoding):
 
 
 class MyThread(threading.Thread):  # 每个线程与一个进程对应
-    def __init__(self, server, server_lock, event, multiprocessing_shared_queue):
+    def __init__(self, event, multiprocessing_shared_queue):
         super().__init__()
+        global server, server_lock
         self.server = server
         self.event = event
         self.server_lock = server_lock
@@ -316,5 +317,8 @@ if __name__ == '__main__':
     socket_manager = serversocket()
     server = Server(args['need_connect_device'], args['client_num'], args['global_epoch'], socket_manager)
     registerStage(server)
-    # server = FedAvgServer(args=args)
-    # server.train()
+    for physical_device in server.all_physical_device_queue:
+        server.socket_manager.sel.unregister(physical_device.sock)
+        physical_device.sock.close()
+    server.socket_manager.sel.close()
+

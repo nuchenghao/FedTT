@@ -6,7 +6,7 @@ dataset: cifar100 #cinic10、
 set_seed: True # True为设置种子，False为性能测试
 seed: 16 # 注意修改data中的seed;
 
-need_connect_device: 3
+need_connect_device: 2
 client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
 global_epoch: 300

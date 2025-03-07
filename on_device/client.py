@@ -238,3 +238,4 @@ if __name__ == '__main__':
     socket_manager = clientsocket()
     client = Client(socket_manager, parser.name)
     register(client)
+    client.socket_manager.sock.close()  # 关闭socket
