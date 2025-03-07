@@ -198,4 +198,5 @@ class Logger:
 def get_argparser() -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument("--config_path", type=str, default="./config/fedavg.yaml")
+    parser.add_argument("--name", type=str,default="")
     return parser
