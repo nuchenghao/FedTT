@@ -77,7 +77,7 @@ class ReadThread(threading.Thread):
             if data:
                 self._recv_buffer += data
             else:
-                raise RuntimeError("Peer closed.")
+                raise RuntimeError("Peer closed.") # 当对端正常关闭连接（发送FIN包）后，本端调用recv()会返回空字节，表示对端已关闭连接。
 
     def process_jsonheader(self):
         hdrlen = self._jsonheader_len
@@ -130,7 +130,7 @@ class MyThread(threading.Thread):  # 每个线程与一个进程对应
     def run(self):
         while True:
             need_to_send = self.client.need_to_send_queue.get()
-            write_process = WriteProcess(self.client.socket_manager.sock, need_to_send , self.print_lock)
+            write_process = WriteProcess(self.client.server_ip_port, need_to_send , self.print_lock)
             write_process.start()
             write_process.join()
             with self.client_lock:
@@ -140,10 +140,12 @@ class MyThread(threading.Thread):  # 每个线程与一个进程对应
 
 
 class WriteProcess(multiprocessing.Process):
-    def __init__(self, socket, need_to_send, print_lock):
+    def __init__(self, server_ip_port, need_to_send, print_lock):
         super().__init__()
         self.need_to_send = need_to_send
-        self.sock = socket
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.setblocking(False)
+        self.sock.connect_ex(server_ip_port) # 创建一个连接
         self.print_lock = print_lock
         self._send_buffer = b""  # 写缓冲区
 
@@ -181,17 +183,59 @@ class WriteProcess(multiprocessing.Process):
         with self.print_lock:
             console.log(f"send to server successfully")
 
+        try:
+            self.sock.close()
+        except OSError as e:
+            with self.print_lock:
+                console.log(f"Error: socket.close() exception: {e!r}")
+        finally:
+            self.sock = None
+
     
 
 
 class clientsocket:
-    def __init__(self, server_ip, server_port):
+    def __init__(self, server_ip, server_port, name):
         self.server_ip = server_ip
         self.server_port = server_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
         self.sock.connect_ex((self.server_ip,self.server_port)) # 创建一个连接
+        self.need_to_send = {"name": name,"action":"register"}
     
+    def _create_message(
+            self, content
+    ):
+        jsonheader = {
+            "content-length": len(content),
+        }
+        jsonheader_bytes = json_encode(jsonheader, "utf-8")
+        message_hdr = struct.pack(">H", len(jsonheader_bytes))
+        message = message_hdr + jsonheader_bytes + content
+        return message
+
+    def _create_response(self):
+        response = encode(self.need_to_send)
+        return response
+
+    def send(self):
+        console.log(f"start registering to server")
+        response = self._create_response()
+        message = self._create_message(response)  # 加两个头文件
+        _send_buffer = b""
+        _send_buffer += message
+        while True:
+            if _send_buffer:
+                try:
+                    sent = self.sock.send(_send_buffer)
+                except BlockingIOError:
+                    pass
+                else:
+                    _send_buffer = _send_buffer[sent:]
+            else:
+                break
+        console.log(f"send to server successfully")
+
     def close(self):
         print(f"Closing connection to {self.server_ip}")
         try:
@@ -210,6 +254,7 @@ def create_content(name, action):  # 这个就是上传的内容格式
 class Client:
     def __init__(self, socket_manager, name):
         self.socket_manager = socket_manager
+        self.server_ip_port = (self.socket_manager.server_ip , self.socket_manager.server_port)
         self.name = name 
         self.received_data = None
 
@@ -217,13 +262,20 @@ class Client:
         self.need_to_send_num = 0
 
 
-
+def read():
+    read_thread = ReadThread()
+    read_thread.start()
+    read_thread.join()
 
 
 
 def run():
     global client, client_lock
     # ============== register================
+    client.socket_manager.send()
+    read()
+    print(client.received_data)
+
     client_2_server_data = create_content(client.name, "register")
     with client_lock:
         client.need_to_send_num += 1
@@ -233,20 +285,6 @@ def run():
             if client.need_to_send_num == 0:
                 break
         time.sleep(1)
-    read_thread = ReadThread()
-    read_thread.start()
-    read_thread.join()
-    print(client.received_data)
-    # with client_lock:
-    #     client.need_to_send_num += 1
-    #     client_2_server_data = create_content(client.name, "successfully received!!")
-    #     client.need_to_send_queue.put(client_2_server_data)
-    # while True:
-    #     with client_lock:
-    #         if client.need_to_send_num == 0:
-    #             break
-    #     time.sleep(1)
-            
 
 
 
@@ -257,7 +295,7 @@ if __name__ == '__main__':
     if args["set_seed"]:
         fix_random_seed(args["seed"])
     
-    socket_manager = clientsocket(args['server_ip'], args['server_port'])
+    socket_manager = clientsocket(args['server_ip'], args['server_port'], parser.name)
     client = Client(socket_manager, parser.name)
     write_daemon_thread = MyThread()
     write_daemon_thread.start()
