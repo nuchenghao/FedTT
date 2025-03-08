@@ -62,7 +62,7 @@ def fix_random_seed(seed: int) -> None:
 
 
 def NN_state_load(
-        src: Union[OrderedDict[str, torch.Tensor], torch.nn.Module],
+        src,
         detach=False,
         requires_name=False,
 ) -> Union[List[torch.Tensor], Tuple[List[torch.Tensor], List[str]]]:
@@ -102,7 +102,7 @@ def NN_state_load(
 
 
 def vectorize(
-        src: Union[OrderedDict[str, torch.Tensor], List[torch.Tensor]], detach=True
+        src, detach=True
 ) -> torch.Tensor:
     """Vectorize and concatenate all tensors in `src`.
 

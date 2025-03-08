@@ -64,28 +64,28 @@ class MyThread(threading.Thread):  # 每个线程与一个进程对应
         super().__init__()
         global server, server_lock
         self.server = server
-        self.event = event
         self.server_lock = server_lock
+        self.event = event
         self.multiprocessing_shared_queue = multiprocessing_shared_queue
 
     def run(self):
         self.event.wait()  # 等待对应的子进程完成
-        option, physical_device_id, value, client_2_server_data= self.multiprocessing_shared_queue.get()
-        if option == "one register":  # 一个注册进程
+        option, physical_device_id, client_2_server_data= self.multiprocessing_shared_queue.get()
+        if option == "register":  # 一个注册进程
             with self.server_lock:
                 physical_device = server.all_physical_device_queue[physical_device_id]
                 assert physical_device.physical_device_id == physical_device_id, f"the physical device id {physical_device_id} is not equal to physical_device.physical_device_id {physical_device.physical_device_id}"
-                physical_device.name = value # 在子线程中进行修改，不能在子进程中修改
+                physical_device.name = client_2_server_data.get("name") # 在子线程中进行修改，不能在子进程中修改
                 server.wait_queue.put("register")
                 if server.wait_queue.qsize() == server.need_connect_device:
                     server.current_state = 'registered'
                     server.wait_queue.queue.clear()
 
-        elif option == "distributed":
+        elif option == "distribute":
             with self.server_lock:
                 physical_device = server.all_physical_device_queue[physical_device_id]
                 assert physical_device.physical_device_id == physical_device_id, f"the physical device id {physical_device_id} is not equal to physical_device.physical_device_id {physical_device.physical_device_id}"
-                server.wait_queue.put("distributed")
+                server.wait_queue.put("distribute")
                 if server.wait_queue.qsize() == server.need_connect_device:
                     server.current_state = 'distributed' 
                     server.wait_queue.queue.clear()
@@ -103,7 +103,7 @@ class ReadProcess(multiprocessing.Process):
         self._recv_buffer = b""  # 接收缓冲区
         self._jsonheader_len = None
         self.jsonheader = None
-        self.request = None
+        self.client_2_server_data = None
 
     def _read(self):
         try:
@@ -133,23 +133,23 @@ class ReadProcess(multiprocessing.Process):
         if not len(self._recv_buffer) >= content_len:
             return
         # 全部数据均已接收
-        data = self._recv_buffer[:content_len]
+        raw_data = self._recv_buffer[:content_len]
         self._recv_buffer = self._recv_buffer[content_len:]
-        self.request = decode(data)
+        self.client_2_server_data = decode(raw_data)
 
-        if self.request.get('action') == 'register':
-            name = self.request.get('name')
+        if self.client_2_server_data.get('action') == 'register':
+            name = self.client_2_server_data.get('name')
             with self.print_lock:
                 console.log(f"Received {name} register request", style="bold yellow")
-            self.multiprocessing_shared_queue.put(("one register", self.physical_device.physical_device_id, name, self.request))  # 返回给server修改,第2个参数表示对应的message
+            self.multiprocessing_shared_queue.put(("register", self.physical_device.physical_device_id, self.client_2_server_data))  # 返回给server修改,第2个参数表示对应的message
 
-        elif self.request.get('action') == 'upload':
+        elif self.client_2_server_data.get('action') == 'upload':
             pass
 
     def run(self):
         with self.print_lock:
             console.log(
-                f"start reading {self.physical_device.name}'s upload whose messageId is {self.physical_device.physical_device_id}" if self.physical_device.name != "" else "A new connection!")
+                f"start reading {self.physical_device.name}'s upload whose physical device id is {self.physical_device.physical_device_id}" if self.physical_device.name != "" else "A new connection!")
         while True:
             self._read()
             if self._jsonheader_len is None:
@@ -158,13 +158,13 @@ class ReadProcess(multiprocessing.Process):
                 if self.jsonheader is None:
                     self.process_jsonheader()
             if self.jsonheader:
-                if self.request is None:
+                if self.client_2_server_data is None:
                     self.process_request()
-                if self.request is not None:
+                if self.client_2_server_data is not None:
                     break
         with self.print_lock:
             console.log(
-                f"finish reading {self.physical_device.name}'s upload whose messageId is {self.physical_device.physical_device_id}" if self.physical_device.name != "" else "A new connection accepted!")
+                f"finish reading {self.physical_device.name}'s upload whose physical device id is {self.physical_device.physical_device_id}" if self.physical_device.name != "" else "A new connection accepted!")
         self.event.set()  # 读进程完成，对应的父进程的子线程可以开始处理数据
 
 
@@ -196,7 +196,7 @@ class WriteProcess(multiprocessing.Process):
 
     def run(self):
         with self.print_lock:
-            console.log(f"start sending to {self.physical_device.name} whose messageId is {self.physical_device.physical_device_id}")
+            console.log(f"start sending to {self.physical_device.name} whose physical device id is {self.physical_device.physical_device_id}")
         response = self._create_response()
         message = self._create_message(response)  # 加两个头文件
         self._send_buffer += message
@@ -210,9 +210,9 @@ class WriteProcess(multiprocessing.Process):
                     self._send_buffer = self._send_buffer[sent:]
             else:
                 break
-        self.multiprocessing_shared_queue.put(("distributed", self.physical_device.physical_device_id, self.physical_device.name, ""))
+        self.multiprocessing_shared_queue.put(("distribute", self.physical_device.physical_device_id, ""))
         with self.print_lock:
-            console.log(f"Sent to {self.physical_device.name} whose messageId is {self.physical_device.physical_device_id}")
+            console.log(f"Sent to {self.physical_device.name} whose physical device id is {self.physical_device.physical_device_id}")
         self.event.set()
 
 
@@ -230,7 +230,7 @@ class Server:
 
         self.all_physical_device_queue = [] # 记录所有物理设备的队列
 
-        self.current_state = None # registered/distributed/download
+        self.current_state = None # registered/distributed/received
 
         self.wait_queue = queue.Queue()  # 多线程共享队列， 存储线程的处理结果; 要注意清空
     
@@ -258,6 +258,16 @@ class physicalDevice:
     
     def __repr__(self):  # 日志输出用
         return f"\n{self.name}'s message id is {self.physical_device_id}"  # 为了适应日志输出，加上换行符
+    
+    def close(self):
+        console.log(f"Closing connection to {self.address}")
+        try:
+            self.sock.close()
+        except OSError as e:
+            print(f"Error: socket.close() exception for {self.address}: {e!r}")
+        finally:
+            self.sock = None
+
 
 
 class serversocket():
@@ -339,6 +349,7 @@ if __name__ == '__main__':
     registerStage(server)
     for physical_device in server.all_physical_device_queue:
         server.socket_manager.sel.unregister(physical_device.sock)
-        physical_device.sock.close()
+        physical_device.close()
+    server.socket_manager.sel.unregister(server.socket_manager.lsock)
     server.socket_manager.sel.close()
 

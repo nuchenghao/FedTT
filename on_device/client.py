@@ -5,7 +5,6 @@ import traceback
 import pickle
 import argparse
 import yaml
-# 输出设置----------------------------------------------------------
 from rich.console import Console
 from rich.padding import Padding
 from pathlib import Path
@@ -15,7 +14,8 @@ import struct
 import threading
 import multiprocessing
 import queue
-
+import selectors
+import time
 
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 sys.path.append(PROJECT_DIR.as_posix())
@@ -60,8 +60,9 @@ def json_decode(json_bytes, encoding):
 class ReadThread(threading.Thread):
     def __init__(self):
         super().__init__()
-        global client 
+        global client , client_lock
         self.client = client
+        self.client_lock = client_lock
         self._recv_buffer = b""
         self._jsonheader_len = None
         self.jsonheader = None
@@ -98,11 +99,11 @@ class ReadThread(threading.Thread):
             return
         data = self._recv_buffer[:content_len]
         self._recv_buffer = self._recv_buffer[content_len:]
-        self.client.received_data = decode(data)  # 反序列化
+        with self.client_lock:
+            self.client.received_data = decode(data)  # 反序列化
         self.finishedRead = True
 
     def run(self):
-        self.client.socket_in_use = True
         while True:
             self._read()
             if self._jsonheader_len is None:
@@ -118,32 +119,32 @@ class ReadThread(threading.Thread):
 
 
 class MyThread(threading.Thread):  # 每个线程与一个进程对应
-    def __init__(self, event, multiprocessing_shared_queue):
+    def __init__(self,):
         super().__init__()
-        global client , client_lock
+        global client , client_lock, print_lock
         self.client = client
         self.client_lock = client_lock
-        self.event = event
-        self.multiprocessing_shared_queue = multiprocessing_shared_queue
+        self.print_lock = print_lock
+        self.daemon = True  # 设置为守护进程
 
     def run(self):
-        self.event.wait()  # 等待对应的子进程完成
-        option = self.multiprocessing_shared_queue.get()
-        if option == "uploaded":  # 一个注册进程
+        while True:
+            need_to_send = self.client.need_to_send_queue.get()
+            write_process = WriteProcess(self.client.socket_manager.sock, need_to_send , self.print_lock)
+            write_process.start()
+            write_process.join()
             with self.client_lock:
-                self.client.socket_in_use = False
+                self.client.need_to_send_num -= 1
 
             
 
 
 class WriteProcess(multiprocessing.Process):
-    def __init__(self, socket, need_to_send, print_lock, event, multiprocessing_shared_queue):
+    def __init__(self, socket, need_to_send, print_lock):
         super().__init__()
         self.need_to_send = need_to_send
         self.sock = socket
         self.print_lock = print_lock
-        self.event = event
-        self.multiprocessing_shared_queue = multiprocessing_shared_queue  # 共享队列
         self._send_buffer = b""  # 写缓冲区
 
     def _create_message(
@@ -177,10 +178,8 @@ class WriteProcess(multiprocessing.Process):
                     self._send_buffer = self._send_buffer[sent:]
             else:
                 break
-        self.multiprocessing_shared_queue.put("uploaded")
         with self.print_lock:
             console.log(f"send to server successfully")
-        self.event.set()
 
     
 
@@ -192,6 +191,16 @@ class clientsocket:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
         self.sock.connect_ex((self.server_ip,self.server_port)) # 创建一个连接
+    
+    def close(self):
+        print(f"Closing connection to {self.server_ip}")
+        try:
+            self.sock.close()
+        except OSError as e:
+            print(f"Error: socket.close() exception for {self.addr}: {e!r}")
+        finally:
+            # Delete reference to socket object for garbage collection
+            self.sock = None
 
 def create_content(name, action):  # 这个就是上传的内容格式
 
@@ -202,41 +211,43 @@ class Client:
     def __init__(self, socket_manager, name):
         self.socket_manager = socket_manager
         self.name = name 
-
         self.received_data = None
 
-        self.socket_in_use = False
         self.need_to_send_queue = queue.Queue()
+        self.need_to_send_num = 0
 
-def send_2_server():
+
+
+
+
+
+def run():
     global client, client_lock
+    # ============== register================
+    client_2_server_data = create_content(client.name, "register")
     with client_lock:
-        client.socket_in_use = True
-        content_client_2_server = client.need_to_send_queue.get()
-    event = multiprocessing.Event()
-    multiprocessing_shared_queue = multiprocessing.Queue()
-    write_thread = MyThread( event, multiprocessing_shared_queue)
-    write_process = WriteProcess(client.socket_manager.sock, content_client_2_server,print_lock,event,multiprocessing_shared_queue)
-    write_thread.start()
-    write_process.start()
-
-
-
-
-
-def register():
-    global client, client_lock
-    content_client_2_server = create_content(client.name,"register")
-    client.need_to_send_queue.put(content_client_2_server)
-    send_2_server()
+        client.need_to_send_num += 1
+        client.need_to_send_queue.put(client_2_server_data)
     while True:
         with client_lock:
-            if client.socket_in_use == False:
+            if client.need_to_send_num == 0:
                 break
+        time.sleep(1)
     read_thread = ReadThread()
     read_thread.start()
     read_thread.join()
-    console.log(client.received_data)
+    print(client.received_data)
+    # with client_lock:
+    #     client.need_to_send_num += 1
+    #     client_2_server_data = create_content(client.name, "successfully received!!")
+    #     client.need_to_send_queue.put(client_2_server_data)
+    # while True:
+    #     with client_lock:
+    #         if client.need_to_send_num == 0:
+    #             break
+    #     time.sleep(1)
+            
+
 
 
 if __name__ == '__main__':
@@ -248,6 +259,9 @@ if __name__ == '__main__':
     
     socket_manager = clientsocket(args['server_ip'], args['server_port'])
     client = Client(socket_manager, parser.name)
-    register()
+    write_daemon_thread = MyThread()
+    write_daemon_thread.start()
+    
+    run()
 
-    client.socket_manager.sock.close()  # 关闭socket
+    client.socket_manager.close()
