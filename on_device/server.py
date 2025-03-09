@@ -74,6 +74,7 @@ class ReadThread(threading.Thread):  # 每个线程与一个进程对应
         read_process = ReadProcess(self.physical_device, self.print_lock, self.multiprocessing_shared_queue, self.keep)
         read_process.start()
         read_process.join()
+
         option, physical_device_id, client_2_server_data = self.multiprocessing_shared_queue.get()
         if option == "register":  # 一个注册进程
             with self.server_lock:
@@ -202,8 +203,8 @@ class WriteThread(threading.Thread):  # 每个线程与一个进程对应
         write_process = WriteProcess(self.content_server_2_client, self.physical_device, self.print_lock, self.multiprocessing_shared_queue)
         write_process.start()
         write_process.join()
+        
         option, physical_device_id = self.multiprocessing_shared_queue.get()
-
         if option == "distribute":
             with self.server_lock:
                 physical_device = server.all_physical_device_queue[physical_device_id]

@@ -287,7 +287,7 @@ def run():
     client_2_server_data = create_content(client.name, "check")
     with client_lock:
         client.need_to_send_num += 1
-        client.need_to_send_queue.put(client_2_server_data)
+    client.need_to_send_queue.put(client_2_server_data)
     while True:
         with client_lock:
             if client.need_to_send_num == 0:
