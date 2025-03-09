@@ -66,6 +66,7 @@ class ReadThread(threading.Thread):
         self._recv_buffer = b""
         self._jsonheader_len = None
         self.jsonheader = None
+        self.server_2_client_data = None
         self.finishedRead = False
 
     def _read(self):
@@ -95,12 +96,17 @@ class ReadThread(threading.Thread):
 
     def process_response(self):
         content_len = self.jsonheader["content-length"]
-        if not len(self._recv_buffer) >= content_len:  # 还没收到完整数据
+        if not len(self._recv_buffer) == content_len:  # 还没收到完整数据
             return
-        data = self._recv_buffer[:content_len]
-        self._recv_buffer = self._recv_buffer[content_len:]
+        raw_data = self._recv_buffer[:content_len]
+        self.server_2_client_data = decode(raw_data)
+
+        server_2_client_time = time.time() - self.server_2_client_data['timestamp']
+        self.server_2_client_data = self.server_2_client_data['content']
+        self.server_2_client_data["server_2_client_time"] = server_2_client_time
+        console.log(f"transmission time is {server_2_client_time}")
         with self.client_lock:
-            self.client.received_data = decode(data)  # 反序列化
+            self.client.received_data = self.server_2_client_data
         self.finishedRead = True
 
     def run(self):
@@ -161,7 +167,8 @@ class WriteProcess(multiprocessing.Process):
         return message
 
     def _create_response(self):
-        response = encode(self.need_to_send)
+        response = dict(timestamp = time.time(), content = self.need_to_send)
+        response = encode(response)
         return response
 
     def run(self):
@@ -215,7 +222,8 @@ class clientsocket:
         return message
 
     def _create_response(self):
-        response = encode(self.need_to_send)
+        response = dict(timestamp = time.time(), content = self.need_to_send)
+        response = encode(response)
         return response
 
     def send(self):
@@ -262,7 +270,7 @@ class Client:
         self.need_to_send_num = 0
 
 
-def read():
+def read_from_server():
     read_thread = ReadThread()
     read_thread.start()
     read_thread.join()
@@ -273,10 +281,10 @@ def run():
     global client, client_lock
     # ============== register================
     client.socket_manager.send()
-    read()
+    read_from_server()
     print(client.received_data)
 
-    client_2_server_data = create_content(client.name, "register")
+    client_2_server_data = create_content(client.name, "check")
     with client_lock:
         client.need_to_send_num += 1
         client.need_to_send_queue.put(client_2_server_data)

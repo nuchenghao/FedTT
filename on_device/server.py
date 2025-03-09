@@ -84,6 +84,13 @@ class ReadThread(threading.Thread):  # 每个线程与一个进程对应
                 if server.wait_queue.qsize() == server.need_connect_device:
                     server.current_state = 'registered'
                     server.wait_queue.queue.clear()
+        elif option == "check":
+            assert physical_device_id == -1
+            with self.server_lock:
+                server.wait_queue.put("check")
+                if server.wait_queue.qsize() == server.need_connect_device:
+                    server.current_state = "checked"
+                    server.wait_queue.queue.clear()
 
 
 class ReadProcess(multiprocessing.Process):
@@ -131,21 +138,27 @@ class ReadProcess(multiprocessing.Process):
 
     def process_request(self):
         content_len = self.jsonheader["content-length"]
-        if not len(self._recv_buffer) >= content_len:
+        if not len(self._recv_buffer) == content_len:
             return
         # 全部数据均已接收
         raw_data = self._recv_buffer[:content_len]
-        self._recv_buffer = self._recv_buffer[content_len:]
         self.client_2_server_data = decode(raw_data)
+
+        client_2_server_time = time.time() - self.client_2_server_data["timestamp"]
+        self.client_2_server_data = self.client_2_server_data["content"]
+        self.client_2_server_data["client_2_server_time"] = client_2_server_time
 
         if self.client_2_server_data.get('action') == 'register':
             name = self.client_2_server_data.get('name')
             with self.print_lock:
-                console.log(f"Received {name} register request", style="bold yellow")
+                console.log(f"Received {name} register request and transmission time is {client_2_server_time}", style="bold yellow")
             self.multiprocessing_shared_queue.put(("register", self.physical_device.physical_device_id, self.client_2_server_data))  # 返回给server修改,第2个参数表示对应的message
 
-        elif self.client_2_server_data.get('action') == 'upload':
-            pass
+        elif self.client_2_server_data.get('action') == 'check':
+            name = self.client_2_server_data.get('name')
+            with self.print_lock:
+                console.log(f"Received {name} check info and transmission time is {client_2_server_time}", style="bold yellow")
+            self.multiprocessing_shared_queue.put(('check', self.physical_device.physical_device_id, self.client_2_server_data))
 
     def run(self):
         with self.print_lock:
@@ -166,6 +179,13 @@ class ReadProcess(multiprocessing.Process):
         with self.print_lock:
             console.log(
                 f"finish reading {self.physical_device.name}'s upload whose physical device id is {self.physical_device.physical_device_id}" if self.physical_device.name != "" else "A new connection accepted!")
+        if not self.keep and self.physical_device.sock != None:
+            try:
+                self.physical_device.sock.close()
+            except OSError as e:
+                console.log(f"Error: socket.close() exception for {self.physical_device.address}: {e!r}")
+            finally:
+                self.physical_device.sock = None
 
 class WriteThread(threading.Thread):  # 每个线程与一个进程对应
     def __init__(self,content_server_2_client, physical_device):
@@ -214,7 +234,8 @@ class WriteProcess(multiprocessing.Process):
         return message
 
     def _create_response(self):
-        response = encode(self.content_server_2_client)
+        response = dict(timestamp = time.time(), content = self.content_server_2_client)
+        response = encode(response)
         return response
 
     def run(self):
@@ -250,9 +271,9 @@ class Server:
 
         self.socket_manager = socket_manager
 
-        self.all_physical_device_queue = [] # 记录所有物理设备的队列
+        self.all_physical_device_queue = [] # 记录所有下发物理设备的队列
 
-        self.current_state = None # registered/distributed/received
+        self.current_state = None # registered/distributed/checked/received
 
         self.wait_queue = queue.Queue()  # 多线程共享队列， 存储线程的处理结果; 要注意清空
     
@@ -262,6 +283,13 @@ class Server:
     def add_client(self):
         self.current_client_nums += 1
     
+    def close_all_sockets(self):
+        for physical_device in self.all_physical_device_queue:
+            self.socket_manager.sel.unregister(physical_device.sock)
+            physical_device.close()
+        self.socket_manager.sel.unregister(self.socket_manager.lsock)
+        self.socket_manager.sel.close()
+
     def finish(self):
         if self.current_epoches == self.total_epoches:
             return True
@@ -306,21 +334,21 @@ class serversocket():
         self.sel.register(self.lsock, selectors.EVENT_READ, data=None)
 
     
-    def accept_wrapper(self, sock, physical_device_id):
+    def accept_wrapper(self, sock, physical_device_id = -1):
         conn, addr = sock.accept()
         conn.setblocking(False)
         physical_device = physicalDevice(conn, physical_device_id, addr)
         self.sel.register(conn, selectors.EVENT_READ, data=physical_device)
         return physical_device
 
- 
+
 def registerStage(server):
     try:
         while True:
             events = server.socket_manager.sel.select(timeout=0)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
             for key, mask in events:
                 if key.data is None:  # 服务端的listening socket；意味着有一个新的连接到来，需要注册
-                    physical_device:physicalDevice = server.socket_manager.accept_wrapper(key.fileobj, server.current_client_nums)
+                    physical_device:physicalDevice = server.socket_manager.accept_wrapper(key.fileobj, physical_device_id = server.current_client_nums)
                     server.add_client()
                     server.all_physical_device_queue.append(physical_device)
                 else:
@@ -330,13 +358,13 @@ def registerStage(server):
                         read_thread = ReadThread(physical_device,True)
                         read_thread.start()
 
-            with server_lock:
+            with server_lock: # 检查是否注册完成
                 if server.current_state is not None:
-                    console.log(f"all the clients has registered! The stateInServer.allClientMessageQueue is {server.all_physical_device_queue}")
+                    console.log(f"all the clients has registered! The server all_physical_device_queue is {server.all_physical_device_queue}")
                     break
         
         for physical_device in server.all_physical_device_queue:
-            write_thread = WriteThread("received your files", physical_device)
+            write_thread = WriteThread({"info":"received your files"}, physical_device)
             write_thread.start()
         
         while True:
@@ -344,28 +372,24 @@ def registerStage(server):
                 if server.current_state == "distributed":
                     console.log("distributed to all clients")
                     break
+            time.sleep(1)
         
         while True:
             events = server.socket_manager.sel.select(timeout=0)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
             for key, mask in events:
                 if key.data is None:  # 服务端的listening socket；意味着有一个新的连接到来，需要注册
-                    physical_device:physicalDevice = server.socket_manager.accept_wrapper(key.fileobj, server.current_client_nums)
-                    server.add_client()
-                    server.all_physical_device_queue.append(physical_device)
+                    server.socket_manager.accept_wrapper(key.fileobj)
                 else:
                     physical_device: physicalDevice = key.data  # 获得该物理设备对应的physicalDevice
-                    server.socket_manager.sel.modify(physical_device.sock, 0, data=physical_device)  # 将这个设备的sock在sel中的状态暂时挂起
+                    server.socket_manager.sel.unregister(physical_device.sock) # 只需要读一次即可
                     if mask & selectors.EVENT_READ:  # 注册阶段只有读事件
                         read_thread = ReadThread(physical_device,False)
                         read_thread.start()
 
             with server_lock:
                 if server.current_state is not None:
-                    console.log(f"all the clients has registered! The stateInServer.allClientMessageQueue is {server.all_physical_device_queue}")
                     break
-        
-            
-            
+
 
     except Exception:
         print("Something wrong in register stage")
@@ -381,9 +405,6 @@ if __name__ == '__main__':
     socket_manager = serversocket(args['server_ip'],args['server_port'])
     server = Server(args['need_connect_device'], args['client_num'], args['global_epoch'], socket_manager)
     registerStage(server)
-    for physical_device in server.all_physical_device_queue:
-        server.socket_manager.sel.unregister(physical_device.sock)
-        physical_device.close()
-    server.socket_manager.sel.unregister(server.socket_manager.lsock)
-    server.socket_manager.sel.close()
+
+    server.close_all_sockets()
 
