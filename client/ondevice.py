@@ -52,7 +52,7 @@ class FedAvgTrainerOnDevice:
         self.args = args
         self.device ="cuda"
         self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
-        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes).to(self.device)
+        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes) # 暂时放置在CPU上
         self.current_client_instance = None
 
         self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / self.args["dataset"], "train")
@@ -61,12 +61,7 @@ class FedAvgTrainerOnDevice:
                                       sampler=self.train_sampler,)
         self.local_epoch = self.args["local_epoch"]
         self._criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
-        self.optimizer = torch.optim.SGD(
-            params=self.model.parameters(),
-            lr=self.args["lr"],
-            momentum=self.args["momentum"],
-            weight_decay=self.args["weight_decay"],
-        )
+        self.optimizer = None
         self.timer = Timer()  # 训练计时器
         self.synchronization = {}
     
@@ -77,6 +72,8 @@ class FedAvgTrainerOnDevice:
     
     def set_parameters(self, trainer_synchronization):
         self.model.load_state_dict(self.current_client.model_dict)
+        self.model = self.model.to(self.device)
+        self.optimizer = torch.optim.SGD(params=self.model.parameters(),lr=self.args["lr"],momentum=self.args["momentum"],weight_decay=self.args["weight_decay"],)
         self.synchronization = trainer_synchronization
 
     def start(self,client,trainer_synchronization):
@@ -86,7 +83,7 @@ class FedAvgTrainerOnDevice:
         self.load_dataset()
 
         self.local_train() # 本地训练
-
+        self.model = self.model.to("cpu") # 训练完成后放置到CPU上
         self.current_client.model_dict = deepcopy(self.model.state_dict())  # 一定要深拷贝
         self.timer.stop()
 

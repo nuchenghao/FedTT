@@ -42,14 +42,14 @@ class FedAvgServerOnDevice:
 
         self.client_sample_stream = [
             random.sample(
-                self.train_client_ids, max(1, int(self.client_num * self.args["client_join_ratio"]))
+                list(range(self.args["client_num"])), max(1, int(self.args["client_num"] * self.args["client_join_ratio"]))
             )
             for _ in range(self.args["global_epoch"])
         ]
         self.current_selected_client_ids: List[int] = []
 
         self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
-        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes).to(self.device)
+        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes)  # 先放置在CPU上 
 
         self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
         self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=self.args['t_batch_size'],

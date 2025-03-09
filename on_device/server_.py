@@ -465,7 +465,7 @@ def trainingstage():
     for global_epoch in range(server.total_epoches):
         server.trainer.select_clients(global_epoch) # 设置本轮被选中的客户
         console.log(f"current selected client ids is {server.trainer.current_selected_client_ids}")
-        server.need_connect_device = len(server.trainer.current_selected_client_ids)
+        server.need_to_uploaded = len(server.trainer.current_selected_client_ids)
         device_current_selected_client_ids = {device_id:[] for device_id in range(server.need_connect_device)} #{设备号：[被选中的id]}
         for current_selected_client_id in server.trainer.current_selected_client_ids: # 遍历被选择的客户id，将device_current_selected_client_ids进行统计
             device_current_selected_client_ids[server.client_ids_device[current_selected_client_id]].append(current_selected_client_id)
@@ -525,6 +525,7 @@ if __name__ == '__main__':
         fix_random_seed(args["seed"])
     socket_manager = serversocket(args['server_ip'],args['server_port'])
     server = Server(args, socket_manager)
+    console.log("initialized successfully")
     registerStage()
     trainingstage()
     server.close_all_sockets()
