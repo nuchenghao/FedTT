@@ -12,11 +12,15 @@ from torch.utils.data import DataLoader, Subset
 import copy
 from collections import Counter
 
-from utls.utils import  evaluate
+
+PROJECT_DIR = Path(__file__).parent.parent.absolute()
+from utls.utils import NN_state_load, evaluate
+from data.utils.datasets import DATASETS
 from utls.utils import Timer
-
-
-
+from collections import defaultdict
+from utls.models import MODEL_DICT
+from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
+from utls.dataset import CustomSampler
 
 class BaseClient:
     def __init__(self, client_id, train_index, batch_size):
@@ -40,28 +44,22 @@ class BaseClient:
     def participate_once(self):
         self.participation_times += 1
 
-
-class FedAvgTrainer:
+class FedAvgTrainerOnDevice:
     def __init__(
             self,
-            device,
-            model,
-            trainloader,
-            testloader,
-            args: dict,
+            args
     ):
         self.args = args
-        self.device = device
-        self.model = model.to(self.device)
-        self.model_size = sum(p.numel() * p.element_size() for p in self.model.parameters())  # 字节数量
+        self.device ="cuda"
+        self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
+        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes).to(self.device)
+        self.current_client_instance = None
 
-        self.current_client = None
-
-        self.trainloader = trainloader
-        self.testloader = testloader
+        self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / self.args["dataset"], "train")
+        self.train_sampler = CustomSampler(list(range(len(self.trainset))))
+        self.trainloader = DataLoader(Subset(self.trainset, list(range(len(self.trainset)))), self.args["batch_size"], num_workers=2,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
+                                      sampler=self.train_sampler,)
         self.local_epoch = self.args["local_epoch"]
-        # TODO:---------------- 实现自己的方法时，这里需要加上reduction='none'-----------------------
-        self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1).to(self.device)
         self._criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
         self.optimizer = torch.optim.SGD(
             params=self.model.parameters(),
@@ -69,48 +67,32 @@ class FedAvgTrainer:
             momentum=self.args["momentum"],
             weight_decay=self.args["weight_decay"],
         )
-        # TODO -------------------其他参数----------------------------
         self.timer = Timer()  # 训练计时器
         self.synchronization = {}
-
-
+    
 
     def load_dataset(self):
         self.trainloader.sampler.set_index(self.current_client.train_set_index)  # 在里面实现了深拷贝
         self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
-
-    def set_parameters(self, optimizer_state_dict, trainer_synchronization):
-        self.optimizer.load_state_dict(optimizer_state_dict)  # 加载全局优化器
+    
+    def set_parameters(self, trainer_synchronization):
         self.model.load_state_dict(self.current_client.model_dict)
         self.synchronization = trainer_synchronization
 
-    def start(self,
-              client,
-              optimizer_state_dict: OrderedDict[str, torch.Tensor],
-              trainer_synchronization
-              ):
+    def start(self,client,trainer_synchronization):
         self.timer.start()
         self.current_client = client
-        self.set_parameters(optimizer_state_dict, trainer_synchronization)  # 设置参数
+        self.set_parameters(trainer_synchronization)  # 设置参数
         self.load_dataset()
-
-        if self.args['client_eval']:
-            self.current_client.pretrained_accuracy = evaluate(self.device, self.model, self.testloader)
-        else:
-            self.current_client.pretrained_accuracy = 0.0
 
         self.local_train() # 本地训练
 
-        if self.args['client_eval']:
-            self.current_client.accuracy = evaluate(self.device, self.model, self.testloader)
-        else:
-            self.current_client.accuracy = 0.0
         self.current_client.model_dict = deepcopy(self.model.state_dict())  # 一定要深拷贝
-        self.timer.stop() # 里面的一些操作带来的开销就权当是网络传输的时间了
+        self.timer.stop()
+
         self.current_client.training_time = self.timer.times[-1]
         self.current_client.participate_once()
-        self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0) # 记录时间
-        torch.cuda.empty_cache() # 释放缓存 
+
         return self.current_client
 
     def full_set(self):
@@ -125,16 +107,13 @@ class FedAvgTrainer:
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
                 loss = self._criterion(outputs, targets).mean() # 两者会有稍许误差
-                # loss = self.criterion(outputs, targets)
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
-
+    
     def local_train(self):
         """
         本地训练函数，后面实现的算法要重写这个函数.
         可以确定的是：在训练前，模型已经在设备上了
         """
         self.full_set()
-
-

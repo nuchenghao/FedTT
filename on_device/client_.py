@@ -29,7 +29,7 @@ from utls.utils import (
     evaluate
 )
 
-from client.fedavg import BaseClient, FedAvgTrainerOnDevice
+from client.ondevice import BaseClient, FedAvgTrainerOnDevice
 
 
 ClientType = {'fedavg':BaseClient}
@@ -319,6 +319,7 @@ def run():
                 break # 全部发送完成，一轮全局结束
         time.sleep(1) 
     
+    # =========== 开始训练 =======================
     while True:
         read_from_server()
         if client.received_data['finished']:
@@ -326,7 +327,8 @@ def run():
         client.model = client.received_data['model']
         client.current_epoch_transmission = client.received_data['server_2_client_time']
         client.current_selected_client_ids = client.received_data['current_selected_client_ids']
-
+        
+        console.log(f"{client.current_selected_client_ids}")
 
         # ============= 与server通信 ===================
         for client_id in client.current_selected_client_ids:

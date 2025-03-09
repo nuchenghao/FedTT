@@ -1,4 +1,4 @@
-python3 -u ./on_device/server.py --config_path ./on_device/config/fedavg.yaml
+python3 -u ./on_device/server_.py --config_path ./on_device/config/fedavg.yaml
 
 
 # python3 -u ./on_device/client.py --config_path ./on_device/config/fedavg.yaml --name AGX_1

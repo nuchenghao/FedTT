@@ -28,7 +28,7 @@ from utls.utils import (
     get_argparser,
     evaluate
 )
-from server.fedavg import FedAvgServerOnDevice
+from server.ondevice import FedAvgServerOnDevice
 
 
 console = Console()  # 终端输出对象
@@ -172,9 +172,9 @@ class ReadProcess(multiprocessing.Process):
             self.multiprocessing_shared_queue.put(('check', self.physical_device.physical_device_id, self.client_2_server_data))
         
         elif self.client_2_server_data.get('action') == 'upload':
-            name = self.client_2_server_data.get('name')
+            client_id = self.client_2_server_data.get('client_id')
             with self.print_lock:
-                console.log(f"Received {name} upload info and transmission time is {client_2_server_time}", style="bold yellow")
+                console.log(f"Received {client_id} upload info and transmission time is {client_2_server_time}", style="bold yellow")
             self.multiprocessing_shared_queue.put(('upload', self.physical_device.physical_device_id, self.client_2_server_data))
 
     def run(self):
@@ -463,21 +463,21 @@ def registerStage():
 def trainingstage():
     global server
     for global_epoch in range(server.total_epoches):
-        server_2_client_data = {"model": server.trainer.get_model_dict(),
-                                "finished": False,}
-        current_selected_client_ids = server.trainer.client_sample_stream[global_epoch] # 当前被选中的客户的id
-        console.log(f"current selected client ids is {current_selected_client_ids}")
-        server.need_connect_device = len(current_selected_client_ids)
+        server.trainer.select_clients(global_epoch) # 设置本轮被选中的客户
+        console.log(f"current selected client ids is {server.trainer.current_selected_client_ids}")
+        server.need_connect_device = len(server.trainer.current_selected_client_ids)
         device_current_selected_client_ids = {device_id:[] for device_id in range(server.need_connect_device)} #{设备号：[被选中的id]}
-        for current_selected_client_id in current_selected_client_ids: # 遍历被选择的客户id，将device_current_selected_client_ids进行统计
+        for current_selected_client_id in server.trainer.current_selected_client_ids: # 遍历被选择的客户id，将device_current_selected_client_ids进行统计
             device_current_selected_client_ids[server.client_ids_device[current_selected_client_id]].append(current_selected_client_id)
 
         # ============= 下发========================
         for physical_device in server.all_physical_device_queue:
             if len(device_current_selected_client_ids[physical_device.physical_device_id]) == 0:
                 continue
-            server_2_client_data["current_selected_client_ids"] = device_current_selected_client_ids[physical_device.physical_device_id]
-            write_thread = WriteThread(copy.deepcopy(server_2_client_data), physical_device) # 注意要深拷贝
+            server_2_client_data = {"model": server.trainer.get_model_dict(),
+                                "finished": False,
+                                "current_selected_client_ids":device_current_selected_client_ids[physical_device.physical_device_id]}
+            write_thread = WriteThread(server_2_client_data, physical_device) # 注意要深拷贝
             write_thread.start()
         
         while True:
