@@ -29,6 +29,12 @@ from utls.utils import (
     evaluate
 )
 
+from client.fedavg import BaseClient, FedAvgTrainerOnDevice
+
+
+ClientType = {'fedavg':BaseClient}
+TrainerType = {'fedavg': FedAvgTrainerOnDevice}
+
 
 console = Console()  # 终端输出对象
 client_lock = threading.RLock()  # 多线程的client访问锁
@@ -254,13 +260,10 @@ class clientsocket:
             # Delete reference to socket object for garbage collection
             self.sock = None
 
-def create_content(name, action):  # 这个就是上传的内容格式
-
-    return dict(name=name,
-                action=action)
 
 class Client:
-    def __init__(self, socket_manager, name):
+    def __init__(self, args, socket_manager, name):
+        self.args = args
         self.socket_manager = socket_manager
         self.server_ip_port = (self.socket_manager.server_ip , self.socket_manager.server_port)
         self.name = name 
@@ -269,6 +272,18 @@ class Client:
         self.need_to_send_queue = queue.Queue()
         self.need_to_send_num = 0
 
+        self.client_ids = []
+        self.clientId_dataIndex = {}
+
+        self.client_instances_dict = {}
+
+        self.trainer = None
+
+        self.model = None 
+
+        self.current_epoch_transmission = 0
+
+        self.current_selected_client_ids = []
 
 def read_from_server():
     read_thread = ReadThread()
@@ -282,17 +297,51 @@ def run():
     # ============== register================
     client.socket_manager.send()
     read_from_server()
-    print(client.received_data)
+    client.client_ids = client.received_data["clients"]
+    client.clientId_dataIndex = client.received_data["data_indices"]
 
-    client_2_server_data = create_content(client.name, "check")
+    # 实例化本地的client
+    for client_id in client.client_ids:
+        client.client_instances_dict[client_id] = ClientType[client.args["algorithm"]](client_id, client.clientId_dataIndex[client_id], client.args["batch_size"])
+    
+    client.trainer = FedAvgTrainerOnDevice(client.args) # 创建训练器
+
+    console.log("initialized successfully")
+
+
+    client_2_server_data = dict(name=client.name,action= "check") 
     with client_lock:
         client.need_to_send_num += 1
     client.need_to_send_queue.put(client_2_server_data)
     while True:
         with client_lock:
             if client.need_to_send_num == 0:
-                break
-        time.sleep(1)
+                break # 全部发送完成，一轮全局结束
+        time.sleep(1) 
+    
+    while True:
+        read_from_server()
+        if client.received_data['finished']:
+            break
+        client.model = client.received_data['model']
+        client.current_epoch_transmission = client.received_data['server_2_client_time']
+        client.current_selected_client_ids = client.received_data['current_selected_client_ids']
+
+
+        # ============= 与server通信 ===================
+        for client_id in client.current_selected_client_ids:
+            client_2_server_data = dict(name=client.name,action="upload",client_id=client_id)
+            with client_lock:
+                client.need_to_send_num += 1
+            client.need_to_send_queue.put(client_2_server_data)
+        while True:
+            with client_lock:
+                if client.need_to_send_num == 0:
+                    break # 全部发送完成，一轮全局结束
+            time.sleep(1) 
+        # =============================
+
+
 
 
 
@@ -304,7 +353,7 @@ if __name__ == '__main__':
         fix_random_seed(args["seed"])
     
     socket_manager = clientsocket(args['server_ip'], args['server_port'], parser.name)
-    client = Client(socket_manager, parser.name)
+    client = Client(args, socket_manager, parser.name)
     write_daemon_thread = MyThread()
     write_daemon_thread.start()
     

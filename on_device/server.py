@@ -3,6 +3,7 @@ import socket
 import selectors
 import random
 import logging
+import copy
 import threading
 import time
 import queue
@@ -27,7 +28,7 @@ from utls.utils import (
     get_argparser,
     evaluate
 )
-
+from server.fedavg import FedAvgServerOnDevice
 
 
 console = Console()  # 终端输出对象
@@ -35,6 +36,7 @@ server_lock = threading.RLock()  # 多线程的stateInServer锁
 print_lock = multiprocessing.RLock()  # 多进程的输出锁
 
 
+TrainerType = {'fedavg':FedAvgServerOnDevice}
 
 
 def encode(obj):
@@ -91,6 +93,14 @@ class ReadThread(threading.Thread):  # 每个线程与一个进程对应
                 server.wait_queue.put("check")
                 if server.wait_queue.qsize() == server.need_connect_device:
                     server.current_state = "checked"
+                    server.wait_queue.queue.clear()
+        
+        elif option == 'upload':
+            assert physical_device_id == -1
+            with self.server_lock:
+                server.wait_queue.put('upload')
+                if server.wait_queue.qsize() == server.need_to_uploaded:
+                    server.current_state = 'uploaded'
                     server.wait_queue.queue.clear()
 
 
@@ -160,6 +170,12 @@ class ReadProcess(multiprocessing.Process):
             with self.print_lock:
                 console.log(f"Received {name} check info and transmission time is {client_2_server_time}", style="bold yellow")
             self.multiprocessing_shared_queue.put(('check', self.physical_device.physical_device_id, self.client_2_server_data))
+        
+        elif self.client_2_server_data.get('action') == 'upload':
+            name = self.client_2_server_data.get('name')
+            with self.print_lock:
+                console.log(f"Received {name} upload info and transmission time is {client_2_server_time}", style="bold yellow")
+            self.multiprocessing_shared_queue.put(('upload', self.physical_device.physical_device_id, self.client_2_server_data))
 
     def run(self):
         with self.print_lock:
@@ -203,7 +219,7 @@ class WriteThread(threading.Thread):  # 每个线程与一个进程对应
         write_process = WriteProcess(self.content_server_2_client, self.physical_device, self.print_lock, self.multiprocessing_shared_queue)
         write_process.start()
         write_process.join()
-        
+
         option, physical_device_id = self.multiprocessing_shared_queue.get()
         if option == "distribute":
             with self.server_lock:
@@ -263,12 +279,16 @@ class WriteProcess(multiprocessing.Process):
 
 
 class Server:
-    def __init__(self,need_connect_device, tot_client_nums, total_epoches, socket_manager):
-        self.need_connect_device = need_connect_device
-        self.current_client_nums = 0
-        self.tot_client_nums = tot_client_nums
+    def __init__(self,args, socket_manager):
+        self.args = args
+        self.need_connect_device = self.args["need_connect_device"] 
+        self.current_device_nums = 0
+        self.tot_client_nums = self.args["client_num"]
+        self.client_ids = list(range(self.tot_client_nums)) # 所有客户的client_id
+        self.client_ids_device = [-1 for _ in range(self.tot_client_nums)]
+        self.device_client_ids = {_ : [] for _ in range(self.need_connect_device)}
         self.current_epoches = 0
-        self.total_epoches = total_epoches
+        self.total_epoches = self.args["global_epoch"]
 
         self.socket_manager = socket_manager
 
@@ -277,12 +297,16 @@ class Server:
         self.current_state = None # registered/distributed/checked/received
 
         self.wait_queue = queue.Queue()  # 多线程共享队列， 存储线程的处理结果; 要注意清空
+
+        self.trainer = TrainerType[self.args['algorithm']](self.args)
+
+        self.need_to_uploaded = 0
     
     def add_epoch(self):
         self.current_epoches += 1
     
-    def add_client(self):
-        self.current_client_nums += 1
+    def add_device(self):
+        self.current_device_nums += 1
     
     def close_all_sockets(self):
         for physical_device in self.all_physical_device_queue:
@@ -306,6 +330,7 @@ class physicalDevice:
         self.physical_device_id = physical_device_id # socket的id，也对应着设备的id
         self.name = ""
         self.address = addr
+        self.client_ids = []
     
     def __repr__(self):  # 日志输出用
         return f"\n{self.name}'s message id is {self.physical_device_id}"  # 为了适应日志输出，加上换行符
@@ -343,40 +368,129 @@ class serversocket():
         return physical_device
 
 
-def registerStage(server):
-    try:
-        while True:
-            events = server.socket_manager.sel.select(timeout=0)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
-            for key, mask in events:
-                if key.data is None:  # 服务端的listening socket；意味着有一个新的连接到来，需要注册
-                    physical_device:physicalDevice = server.socket_manager.accept_wrapper(key.fileobj, physical_device_id = server.current_client_nums)
-                    server.add_client()
-                    server.all_physical_device_queue.append(physical_device)
-                else:
-                    physical_device: physicalDevice = key.data  # 获得该物理设备对应的physicalDevice
-                    server.socket_manager.sel.modify(physical_device.sock, 0, data=physical_device)  # 将这个设备的sock在sel中的状态暂时挂起
-                    if mask & selectors.EVENT_READ:  # 注册阶段只有读事件
-                        read_thread = ReadThread(physical_device,True)
-                        read_thread.start()
+def split_list_to_clients(lst, num_clients):
+    # 打乱列表以确保随机分配
+    shuffled = copy.deepcopy(lst)
+    random.shuffle(shuffled)
+  
+    # 计算每个 client 的基本元素数量和余数
+    total = len(shuffled)
+    base = total // num_clients
+    remainder = total % num_clients
+  
+    divided = []
+    start = 0
+  
+    # 分配前 num_clients-1 个 client，每个分 base 个元素
+    for i in range(num_clients - 1):
+        end = start + base
+        divided.append(shuffled[start:end])
+        start = end
+  
+    # 最后一个 client 分 base + remainder 个元素
+    divided.append(shuffled[start:])
+  
+    return divided
 
-            with server_lock: # 检查是否注册完成
-                if server.current_state is not None:
-                    console.log(f"all the clients has registered! The server all_physical_device_queue is {server.all_physical_device_queue}")
-                    break
-        
+
+def registerStage():
+    global server
+    # 开始注册
+    while True:
+        events = server.socket_manager.sel.select(timeout=1)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
+        for key, mask in events:
+            if key.data is None:  # 服务端的listening socket；意味着有一个新的连接到来，需要注册
+                physical_device:physicalDevice = server.socket_manager.accept_wrapper(key.fileobj, physical_device_id = server.current_device_nums)
+                server.add_device()
+                server.all_physical_device_queue.append(physical_device)
+            else:
+                physical_device: physicalDevice = key.data  # 获得该物理设备对应的physicalDevice
+                server.socket_manager.sel.modify(physical_device.sock, 0, data=physical_device)  # 将这个设备的sock在sel中的状态暂时挂起
+                if mask & selectors.EVENT_READ:  # 注册阶段只有读事件
+                    read_thread = ReadThread(physical_device,True)
+                    read_thread.start()
+
+        with server_lock: # 检查是否注册完成
+            if server.current_state == "registered":
+                console.log(f"all the devices has registered! The server all_physical_device_queue is {server.all_physical_device_queue}")
+                break  # 所有设备都已经注册了
+    
+    
+    # 下发数据集的划分与每个设备上的client的分配
+    client_splits = split_list_to_clients(server.client_ids, server.need_connect_device)
+    for i in range(server.need_connect_device):
+        console.log(f"{client_splits[i]}")
+        server.all_physical_device_queue[i].client_ids = client_splits[i]
+        server.device_client_ids[i] = client_splits[i]
+        for client_id in client_splits[i]:
+            server.client_ids_device[client_id] = i
+
+    partition_path = PROJECT_DIR / "data" / server.args["dataset"] / "partition.pkl"
+    with open(partition_path, "rb") as f:
+        partition = pickle.load(f)
+    for physical_device in server.all_physical_device_queue:
+        server_2_client_data = {"clients": physical_device.client_ids,
+                                "data_indices":{client_id:partition["data_indices"][client_id].tolist() for client_id in physical_device.client_ids},}
+        write_thread = WriteThread(server_2_client_data, physical_device)
+        write_thread.start()
+    
+    while True:
+        with server_lock:
+            if server.current_state == "distributed":
+                console.log("distributed to all clients")
+                break # 全部发送完成
+        time.sleep(1)
+    
+    # 准备接收check信息
+    while True:
+        events = server.socket_manager.sel.select(timeout=1)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
+        for key, mask in events:
+            if key.data is None:  # 服务端的listening socket；意味着有一个新的连接到来，需要注册
+                server.socket_manager.accept_wrapper(key.fileobj)
+            else:
+                physical_device: physicalDevice = key.data  # 获得该物理设备对应的physicalDevice
+                server.socket_manager.sel.unregister(physical_device.sock) # 只需要读一次即可
+                if mask & selectors.EVENT_READ:  # 注册阶段只有读事件
+                    read_thread = ReadThread(physical_device,False)
+                    read_thread.start()
+
+        with server_lock:
+            if server.current_state == "checked":
+                break  # 接收完成
+    console.rule("start training")
+
+
+def trainingstage():
+    global server
+    for global_epoch in range(server.total_epoches):
+        server_2_client_data = {"model": server.trainer.get_model_dict(),
+                                "finished": False,}
+        current_selected_client_ids = server.trainer.client_sample_stream[global_epoch] # 当前被选中的客户的id
+        console.log(f"current selected client ids is {current_selected_client_ids}")
+        server.need_connect_device = len(current_selected_client_ids)
+        device_current_selected_client_ids = {device_id:[] for device_id in range(server.need_connect_device)} #{设备号：[被选中的id]}
+        for current_selected_client_id in current_selected_client_ids: # 遍历被选择的客户id，将device_current_selected_client_ids进行统计
+            device_current_selected_client_ids[server.client_ids_device[current_selected_client_id]].append(current_selected_client_id)
+
+        # ============= 下发========================
         for physical_device in server.all_physical_device_queue:
-            write_thread = WriteThread({"info":"received your files"}, physical_device)
+            if len(device_current_selected_client_ids[physical_device.physical_device_id]) == 0:
+                continue
+            server_2_client_data["current_selected_client_ids"] = device_current_selected_client_ids[physical_device.physical_device_id]
+            write_thread = WriteThread(copy.deepcopy(server_2_client_data), physical_device) # 注意要深拷贝
             write_thread.start()
         
         while True:
             with server_lock:
                 if server.current_state == "distributed":
                     console.log("distributed to all clients")
-                    break
+                    break # 全部发送完成
             time.sleep(1)
+        # ========================================================
         
+        # 准备接收uploaded信息
         while True:
-            events = server.socket_manager.sel.select(timeout=0)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
+            events = server.socket_manager.sel.select(timeout=1)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
             for key, mask in events:
                 if key.data is None:  # 服务端的listening socket；意味着有一个新的连接到来，需要注册
                     server.socket_manager.accept_wrapper(key.fileobj)
@@ -388,12 +502,18 @@ def registerStage(server):
                         read_thread.start()
 
             with server_lock:
-                if server.current_state is not None:
-                    break
-
-
-    except Exception:
-        print("Something wrong in register stage")
+                if server.current_state == "uploaded":
+                    break  # 接收完成
+    server_2_client_data = {"finished": True,}
+    for physical_device in server.all_physical_device_queue:
+        write_thread = WriteThread(server_2_client_data, physical_device) # 注意要深拷贝
+        write_thread.start()
+    while True:
+        with server_lock:
+            if server.current_state == "distributed":
+                console.log("distributed to all clients")
+                break # 全部发送完成
+        time.sleep(1)
 
 
 
@@ -404,8 +524,8 @@ if __name__ == '__main__':
     if args["set_seed"]:
         fix_random_seed(args["seed"])
     socket_manager = serversocket(args['server_ip'],args['server_port'])
-    server = Server(args['need_connect_device'], args['client_num'], args['global_epoch'], socket_manager)
-    registerStage(server)
-
+    server = Server(args, socket_manager)
+    registerStage()
+    trainingstage()
     server.close_all_sockets()
 
