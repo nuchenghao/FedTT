@@ -13,10 +13,13 @@ import io
 import struct
 import threading
 import multiprocessing
+from torch.utils.data import DataLoader, Subset
+import torch
 import queue
 import selectors
+import copy
 import time
-
+import numpy as np
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 sys.path.append(PROJECT_DIR.as_posix())
 sys.path.append(PROJECT_DIR.joinpath("src").as_posix())
@@ -29,16 +32,114 @@ from utls.utils import (
     evaluate
 )
 
-from client.ondevice import BaseClient, FedAvgTrainerOnDevice
-
-
-ClientType = {'fedavg':BaseClient}
-TrainerType = {'fedavg': FedAvgTrainerOnDevice}
+from utls.models import MODEL_DICT
+from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
+from utls.dataset import CustomSampler
+from utls.utils import Timer
 
 
 console = Console()  # 终端输出对象
 client_lock = threading.RLock()  # 多线程的client访问锁
 print_lock = multiprocessing.RLock()  # 多进程的输出锁
+
+
+
+class BaseClient:
+    def __init__(self, client_id, train_index, batch_size):
+        self.client_id = client_id
+        self.train_set_index = np.array(train_index)
+        self.train_set_len = len(train_index)
+        self.participation_times = 0
+
+        self.batch_size = batch_size
+
+        self.training_time = 0
+        self.pretrained_accuracy = 0
+        self.accuracy = 0
+        self.loss = 0.0
+        self.grad = None #存梯度值
+        self.buffer = None # 存persistent_buffers
+
+        self.training_time_record = {}
+
+    def participate_once(self):
+        self.participation_times += 1
+
+    def neet_to_send(self):
+        return {}
+
+class Trainer:
+    def __init__(
+            self,
+            args
+    ):
+        self.args = args
+        self.device ="cuda"
+        self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
+        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes) # 暂时放置在CPU上
+        self.current_client_instance = None
+
+        self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / self.args["dataset"], "train")
+        self.train_sampler = CustomSampler(list(range(len(self.trainset))))
+        self.trainloader = DataLoader(Subset(self.trainset, list(range(len(self.trainset)))), self.args["batch_size"], num_workers=2,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
+                                      sampler=self.train_sampler,)
+        self.local_epoch = self.args["local_epoch"]
+        self._criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
+        self.optimizer = None
+        self.timer = Timer()  # 训练计时器
+    
+
+    def load_dataset(self):
+        self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)  # 在里面实现了深拷贝
+        self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
+    
+    def set_parameters(self,model_parameters):
+        self.model.load_state_dict(model_parameters)
+        self.model = self.model.to(self.device) # 转移到gpu上
+        self.optimizer = torch.optim.SGD(params=self.model.parameters(),lr=self.args["lr"],momentum=self.args["momentum"],weight_decay=self.args["weight_decay"],)
+
+    def start(self,global_epoch, client_instance, model_parameters):
+        self.timer.start()
+        self.current_client_instance = client_instance
+        self.set_parameters(model_parameters)  # 设置参数
+        self.load_dataset()
+
+        self.local_train() # 本地训练
+        self.model = self.model.to("cpu") # 训练完成后放置到CPU上
+
+        # 拷贝模型参数
+        current_client_instance_model_dict = {key: copy.deepcopy(value) for key, value in self.model.state_dict().items()}  # 一定要深拷贝
+        self.timer.stop()
+
+        self.current_client_instance.training_time_record[global_epoch] = self.timer.times[-1]
+        self.current_client_instance.participate_once()
+
+        # 返回训练后的模型参数，训练时间
+        return current_client_instance_model_dict, self.current_client_instance.training_time_record[global_epoch]
+
+    def full_set(self):
+        self.model.train()
+        for _ in range(self.local_epoch):
+            for inputs, targets in self.trainloader:
+                if isinstance(inputs,torch.Tensor):
+                    inputs = inputs.to(self.device, non_blocking=True)
+                else:
+                    inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
+                targets = targets.to(self.device,non_blocking=True)
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self._criterion(outputs, targets).mean() # 两者会有稍许误差
+                loss.backward()
+                self.optimizer.step()
+        torch.cuda.synchronize()
+    
+    def local_train(self):
+        """
+        本地训练函数，后面实现的算法要重写这个函数.
+        可以确定的是：在训练前，模型已经在设备上了
+        """
+        self.full_set()
+
 
 
 
@@ -110,7 +211,6 @@ class ReadThread(threading.Thread):
         server_2_client_time = time.time() - self.server_2_client_data['timestamp']
         self.server_2_client_data = self.server_2_client_data['content']
         self.server_2_client_data["server_2_client_time"] = server_2_client_time
-        console.log(f"transmission time is {server_2_client_time}")
         with self.client_lock:
             self.client.received_data = self.server_2_client_data
         self.finishedRead = True
@@ -279,7 +379,7 @@ class Client:
 
         self.client_instances_dict = {} # client的id号和其对应的client实例
 
-        self.trainer = TrainerType[self.args["algorithm"]](self.args) # 训练器
+        self.trainer = Trainer(self.args) # 训练器
 
         self.current_epoch_transmission = 0 # 当前轮次的server发送给client的传输时间
 
@@ -305,7 +405,7 @@ def run():
     console.log(f"device {client.name} need to train {client.client_ids}" , style='red')
     # 实例化本地的client
     for client_id in client.client_ids:
-        client.client_instances_dict[client_id] = ClientType[client.args["algorithm"]](client_id, client.clientId_dataIndex[client_id], client.args["batch_size"])
+        client.client_instances_dict[client_id] = BaseClient(client_id, client.clientId_dataIndex[client_id], client.args["batch_size"])
     
     console.log("clients has been initialized successfully")
 
@@ -330,6 +430,7 @@ def run():
         if client.received_data['finished']:
             break
         console.rule(f"start {client.received_data['global_epoch']}",style='red')
+        console.log(f"transmission time is {client.received_data['server_2_client_time']}")
         client.model = client.received_data['model']
         client.current_epoch_transmission = client.received_data['server_2_client_time']
         client.current_selected_client_ids = client.received_data['current_selected_client_ids']

@@ -13,6 +13,9 @@ import wandb
 import os
 import pickle
 import multiprocessing
+import torch
+from torch.utils.data import DataLoader, Subset
+from collections import OrderedDict
 import yaml
 import io
 import struct
@@ -29,7 +32,10 @@ from utls.utils import (
     get_argparser,
     evaluate
 )
-from server.ondevice import FedAvgServerOnDevice
+from typing import Dict, List
+from utls.models import MODEL_DICT
+from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
+from utls.dataset import CustomSampler
 
 
 console = Console()  # 终端输出对象
@@ -37,7 +43,66 @@ server_lock = threading.RLock()  # 多线程的stateInServer锁
 print_lock = multiprocessing.RLock()  # 多进程的输出锁
 
 
-TrainerType = {'fedavg':FedAvgServerOnDevice}
+
+class Trainer:
+    def __init__(self, args):
+        self.args = args
+        self.device = 'cuda'
+        self.current_time = 0  # 全局时间
+        
+
+        self.client_sample_stream = [
+            random.sample(
+                list(range(self.args["client_num"])), max(1, int(self.args["client_num"] * self.args["client_join_ratio"]))
+            )
+            for _ in range(self.args["global_epoch"])
+        ]
+        self.current_selected_client_ids: List[int] = []
+
+        self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
+        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes)  # 先放置在CPU上 
+
+        self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
+        self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=self.args['t_batch_size'],
+                                     shuffle=False, pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
+                                     persistent_workers=True, pin_memory_device='cuda:0',prefetch_factor = 8)
+        
+        self.client_model_cache = queue.Queue()
+        self.weight_cache = queue.Queue()
+
+    def select_clients(self, global_epoch):
+        self.current_selected_client_ids = self.client_sample_stream[global_epoch - 1] #我们的全局从1开始
+
+
+    def get_model_dict(self):
+        return {key: value for key, value in self.model.state_dict().items()}
+    
+
+    def aggregate(self):
+        with torch.no_grad():
+            client_model_cache = []
+            while True:
+                try:
+                    element = self.client_model_cache.get_nowait()
+                    client_model_cache.append(element)
+                except queue.Empty:
+                    break
+            weight_cache = []
+            while True:
+                try:
+                    element = self.weight_cache.get_nowait()
+                    weight_cache.append(element)
+                except queue.Empty:
+                    break
+            weights = torch.tensor(weight_cache) / sum(weight_cache)
+            model_list = [list(delta.values()) for delta in client_model_cache]
+            aggregated_model = [
+                torch.sum(weights * torch.stack(grad, dim=-1), dim=-1)
+                for grad in zip(*model_list)
+            ]
+            averaged_state_dict = OrderedDict(zip(client_model_cache[0].keys(), aggregated_model))
+            self.model.load_state_dict(averaged_state_dict)
+
 
 
 def encode(obj):
@@ -303,7 +368,7 @@ class Server:
 
         self.wait_queue = queue.Queue()  # 多线程共享队列， 存储线程的处理结果; 要注意清空
 
-        self.trainer = TrainerType[self.args['algorithm']](self.args)
+        self.trainer = Trainer(self.args)
 
         self.need_to_uploaded = 0
 
@@ -493,8 +558,6 @@ def trainingstage():
             device_current_selected_client_ids[server.client_ids_device[current_selected_client_id]].append(current_selected_client_id)
         console.log(f"current selected client ids is {device_current_selected_client_ids}")
 
-        # 服务器预处理
-        server.trainer.preprocess(server)
 
         # ============= 下发========================
         for physical_device in server.all_physical_device_queue:
