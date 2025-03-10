@@ -143,6 +143,7 @@ def evaluate(
         correct += (pred == targets).sum().item()
         total += targets.size(0)
     accuracy = 100. * correct / total
+    torch.cuda.empty_cache()
     return accuracy , total_loss
 
 

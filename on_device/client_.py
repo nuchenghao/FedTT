@@ -266,24 +266,24 @@ class Client:
         self.args = args
         self.socket_manager = socket_manager
         self.server_ip_port = (self.socket_manager.server_ip , self.socket_manager.server_port)
-        self.name = name 
+        self.name = name  # 设备名称
         self.received_data = None
 
-        self.need_to_send_queue = queue.Queue()
-        self.need_to_send_num = 0
+        self.need_to_send_queue = queue.Queue() # 给写守护进程的发送队列
+        self.need_to_send_num = 0 # 标志是否都发送完成，不可由need_to_send_queue.qsize()代替。因为qsize()==0时，可能还在发送
 
-        self.client_ids = []
-        self.clientId_dataIndex = {}
+        self.client_ids = [] # 存储本地要训练的client的id号
+        self.clientId_dataIndex = {} # client的id号和其训练数据的索引
 
-        self.client_instances_dict = {}
+        self.client_instances_dict = {} # client的id号和其对应的client实例
 
-        self.trainer = None
+        self.trainer = TrainerType[self.args["algorithm"]](self.args) # 训练器
 
-        self.model = None 
+        self.current_epoch_transmission = 0 # 当前轮次的server发送给client的传输时间
 
-        self.current_epoch_transmission = 0
+        self.current_selected_client_ids = [] # 当前全局训练轮次中被选中的client
 
-        self.current_selected_client_ids = []
+        self.model = None # 记录本轮次中从server接收的全局模型参数
 
 def read_from_server():
     read_thread = ReadThread()
@@ -300,13 +300,12 @@ def run():
     client.client_ids = client.received_data["clients"]
     client.clientId_dataIndex = client.received_data["data_indices"]
 
+    console.log(f"device {client.name} need to train {client.client_ids}" , style='red')
     # 实例化本地的client
     for client_id in client.client_ids:
         client.client_instances_dict[client_id] = ClientType[client.args["algorithm"]](client_id, client.clientId_dataIndex[client_id], client.args["batch_size"])
     
-    client.trainer = FedAvgTrainerOnDevice(client.args) # 创建训练器
-
-    console.log("initialized successfully")
+    console.log("clients has been initialized successfully")
 
 
     client_2_server_data = dict(name=client.name,action= "check") 
@@ -321,21 +320,36 @@ def run():
     
     # =========== 开始训练 =======================
     while True:
-        read_from_server()
+        # ======== 接收 ==============
+        read_from_server() 
+
+
+
         if client.received_data['finished']:
             break
         client.model = client.received_data['model']
         client.current_epoch_transmission = client.received_data['server_2_client_time']
         client.current_selected_client_ids = client.received_data['current_selected_client_ids']
         
-        console.log(f"{client.current_selected_client_ids}")
-
-        # ============= 与server通信 ===================
+        console.log(f"need to train {client.current_selected_client_ids} in global epoch {client.received_data['global_epoch']}")
         for client_id in client.current_selected_client_ids:
-            client_2_server_data = dict(name=client.name,action="upload",client_id=client_id, client_model = client.model, weight = client.client_instances_dict[client_id].train_set_len)
+            assert client_id in client.client_ids , f"{client_id} do not belongs to the device" 
+            current_client_instance_model_dict, training_time = client.trainer.start(client.received_data['global_epoch'],client.client_instances_dict[client_id],client.model)
+            
+            client_2_server_data = dict(
+                                        name=client.name, # 设备名称
+                                        action="upload", # 行为
+                                        client_id=client_id,  # 训练的client id号
+                                        client_model = current_client_instance_model_dict, # 模型参数
+                                        weight = client.client_instances_dict[client_id].train_set_len, # 权重
+                                        s2c_training_time = training_time + client.current_epoch_transmission) # 训练时间
+            console.log(f"{client_id} has finished training, using {training_time}s")
             with client_lock:
                 client.need_to_send_num += 1
             client.need_to_send_queue.put(client_2_server_data)
+
+        console.log(f"{client.name} has finished local training of all selected clients")
+
         while True:
             with client_lock:
                 if client.need_to_send_num == 0:

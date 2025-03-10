@@ -10,6 +10,7 @@ import queue
 from rich.console import Console
 from rich.padding import Padding
 import wandb
+import os
 import pickle
 import multiprocessing
 import yaml
@@ -79,6 +80,7 @@ class ReadThread(threading.Thread):  # 每个线程与一个进程对应
             read_process.join()
 
             option, physical_device_id, client_2_server_data = multiprocessing_shared_queue.get()
+        
         if option == "register":  # 一个注册进程
             with self.server_lock:
                 physical_device = server.all_physical_device_queue[physical_device_id]
@@ -88,6 +90,7 @@ class ReadThread(threading.Thread):  # 每个线程与一个进程对应
                 if server.wait_queue.qsize() == server.need_connect_device:
                     server.current_state = 'registered'
                     server.wait_queue.queue.clear()
+
         elif option == "check":
             assert physical_device_id == -1
             with self.server_lock:
@@ -98,8 +101,9 @@ class ReadThread(threading.Thread):  # 每个线程与一个进程对应
         
         elif option == 'upload':
             assert physical_device_id == -1
-            self.server.trainer.client_model_cache.put(client_2_server_data['client_model'])
-            self.server.trainer.weight_cache.put(client_2_server_data['weight'])
+            self.server.trainer.client_model_cache.put(client_2_server_data['client_model']) # 放置模型参数
+            self.server.trainer.weight_cache.put(client_2_server_data['weight']) # 放置权重
+            self.server.globel_epoch_training_time[self.server.current_epoch].append((client_2_server_data['client_id'],client_2_server_data['s2c_training_time'] + client_2_server_data["client_2_server_time"])) # 记录训练时间
             with self.server_lock:
                 server.wait_queue.put('upload')
                 if server.wait_queue.qsize() == server.need_to_uploaded:
@@ -281,13 +285,14 @@ class WriteProcess(multiprocessing.Process):
 class Server:
     def __init__(self,args, socket_manager):
         self.args = args
+        self.global_time = 0 # 记录全局时间 
         self.need_connect_device = self.args["need_connect_device"] 
         self.current_device_nums = 0
         self.tot_client_nums = self.args["client_num"]
         self.client_ids = list(range(self.tot_client_nums)) # 所有客户的client_id
         self.client_ids_device = [-1 for _ in range(self.tot_client_nums)]
         self.device_client_ids = {_ : [] for _ in range(self.need_connect_device)}
-        self.current_epoches = 0
+        
         self.total_epoches = self.args["global_epoch"]
 
         self.socket_manager = socket_manager
@@ -301,9 +306,27 @@ class Server:
         self.trainer = TrainerType[self.args['algorithm']](self.args)
 
         self.need_to_uploaded = 0
+
+        self.current_epoch = 0
+        self.globel_epoch_training_time = {global_epoch:[] for global_epoch in range(1 , 1 + self.total_epoches)} # {global epoch : (client_id , 整轮需要的训练时间)}
+
+        # wandb
+        if self.args['wandb']:
+            log_dir = f"{PROJECT_DIR}/WANDB_LOG_DIR"
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+
+            self.experiment = wandb.init(
+                project=f"{self.args['project']}",
+                config=self.args,
+                dir=log_dir,
+                reinit=True,
+            )
+            self.experiment.name = self.args["experiment_name"]
+            self.experiment.log({"acc": 0.0}, step=0)
+            wandb.run.save()
+            
     
-    def add_epoch(self):
-        self.current_epoches += 1
     
     def add_device(self):
         self.current_device_nums += 1
@@ -315,11 +338,7 @@ class Server:
         self.socket_manager.sel.unregister(self.socket_manager.lsock)
         self.socket_manager.sel.close()
 
-    def finish(self):
-        if self.current_epoches == self.total_epoches:
-            return True
-        else :
-            return False
+
     
 
 
@@ -458,26 +477,34 @@ def registerStage():
             if server.current_state == "checked":
                 console.log("received all checked info", style="red")
                 break  # 接收完成
-    console.rule("start training")
+    
 
 
 def trainingstage():
     global server
-    for global_epoch in range(server.total_epoches):
+    for global_epoch in range(1,server.total_epoches + 1):
+        console.rule(f"start global epoch {global_epoch} training ",style="red")
+        server.current_epoch = global_epoch  # 设置当前的轮数
         server.trainer.select_clients(global_epoch) # 设置本轮被选中的客户
-        console.log(f"current selected client ids is {server.trainer.current_selected_client_ids}")
         server.need_to_uploaded = len(server.trainer.current_selected_client_ids)
+
         device_current_selected_client_ids = {device_id:[] for device_id in range(server.need_connect_device)} #{设备号：[被选中的id]}
         for current_selected_client_id in server.trainer.current_selected_client_ids: # 遍历被选择的客户id，将device_current_selected_client_ids进行统计
             device_current_selected_client_ids[server.client_ids_device[current_selected_client_id]].append(current_selected_client_id)
+        console.log(f"current selected client ids is {device_current_selected_client_ids}")
+
+        # 服务器预处理
+        server.trainer.preprocess(server)
 
         # ============= 下发========================
         for physical_device in server.all_physical_device_queue:
             if len(device_current_selected_client_ids[physical_device.physical_device_id]) == 0:
                 continue
+            # 发给client的信息
             server_2_client_data = {"model": server.trainer.get_model_dict(),
-                                "finished": False,
-                                "current_selected_client_ids":device_current_selected_client_ids[physical_device.physical_device_id]}
+                                    "finished": False,
+                                    "current_selected_client_ids":device_current_selected_client_ids[physical_device.physical_device_id],
+                                    "global_epoch": global_epoch}
             write_thread = WriteThread(server_2_client_data, physical_device) # 注意要深拷贝
             write_thread.start()
         
@@ -506,11 +533,24 @@ def trainingstage():
                 if server.current_state == "uploaded":
                     console.log("received all the uploaded of current selected clients", style="red")
                     break  # 接收完成
-        # server.trainer.aggregate()
+        
+        server.trainer.aggregate() # 聚合
+
         server.trainer.model = server.trainer.model.to(server.trainer.device) # 测试之前移动到gpu上
         accuracy,loss = evaluate("cuda:0", server.trainer.model, server.trainer.testloader)
         server.trainer.model = server.trainer.model.to("cpu") # 一定要转移到cpu上
-        console.log(f"the {global_epoch} global epoch acc is {accuracy}",style="bold red on white")
+
+        clientId_time_list = server.globel_epoch_training_time[global_epoch]
+        client_time = []
+        for clientId_time in clientId_time_list:
+            assert clientId_time[0] in server.trainer.current_selected_client_ids
+            client_time.append(clientId_time[1])
+        server.global_time += max(client_time) # 全局时间加上最长设备时间
+        console.log(f"the {global_epoch} global epoch acc is {accuracy}, used {max(client_time)}s. Current global time is {server.global_time}",style="bold red on white")
+        if server.args['wandb']:
+            server.experiment.log({"acc":accuracy},step = int(server.global_time))
+
+        
     console.rule("finished training")
     server_2_client_data = {"finished": True,}
     for physical_device in server.all_physical_device_queue:

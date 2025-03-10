@@ -31,7 +31,6 @@ class BaseClient:
 
         self.batch_size = batch_size
 
-        self.model_dict = None  # 存当前的全局模型状态
         self.training_time = 0
         self.pretrained_accuracy = 0
         self.accuracy = 0
@@ -63,34 +62,35 @@ class FedAvgTrainerOnDevice:
         self._criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
         self.optimizer = None
         self.timer = Timer()  # 训练计时器
-        self.synchronization = {}
     
 
     def load_dataset(self):
-        self.trainloader.sampler.set_index(self.current_client.train_set_index)  # 在里面实现了深拷贝
-        self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
+        self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)  # 在里面实现了深拷贝
+        self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
     
-    def set_parameters(self, trainer_synchronization):
-        self.model.load_state_dict(self.current_client.model_dict)
-        self.model = self.model.to(self.device)
+    def set_parameters(self,model_parameters):
+        self.model.load_state_dict(model_parameters)
+        self.model = self.model.to(self.device) # 转移到gpu上
         self.optimizer = torch.optim.SGD(params=self.model.parameters(),lr=self.args["lr"],momentum=self.args["momentum"],weight_decay=self.args["weight_decay"],)
-        self.synchronization = trainer_synchronization
 
-    def start(self,client,trainer_synchronization):
+    def start(self,global_epoch, client_instance, model_parameters):
         self.timer.start()
-        self.current_client = client
-        self.set_parameters(trainer_synchronization)  # 设置参数
+        self.current_client_instance = client_instance
+        self.set_parameters(model_parameters)  # 设置参数
         self.load_dataset()
 
         self.local_train() # 本地训练
         self.model = self.model.to("cpu") # 训练完成后放置到CPU上
-        self.current_client.model_dict = deepcopy(self.model.state_dict())  # 一定要深拷贝
+
+        # 拷贝模型参数
+        current_client_instance_model_dict = {key: copy.deepcopy(value) for key, value in self.model.state_dict().items()}  # 一定要深拷贝
         self.timer.stop()
 
-        self.current_client.training_time = self.timer.times[-1]
-        self.current_client.participate_once()
+        self.current_client_instance.training_time_record[global_epoch] = self.timer.times[-1]
+        self.current_client_instance.participate_once()
 
-        return self.current_client
+        # 返回训练后的模型参数，训练时间
+        return current_client_instance_model_dict, self.current_client_instance.training_time_record[global_epoch]
 
     def full_set(self):
         self.model.train()

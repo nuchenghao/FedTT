@@ -60,12 +60,15 @@ class FedAvgServerOnDevice:
         self.weight_cache = queue.Queue()
 
     def select_clients(self, global_epoch):
-        self.current_selected_client_ids = self.client_sample_stream[global_epoch]
+        self.current_selected_client_ids = self.client_sample_stream[global_epoch - 1] #我们的全局从1开始
 
 
     def get_model_dict(self):
         return {key: value for key, value in self.model.state_dict().items()}
     
+    def preprocess(self, server):
+        pass
+
     def aggregate(self):
         with torch.no_grad():
             client_model_cache = []
