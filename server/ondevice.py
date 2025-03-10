@@ -55,6 +55,9 @@ class FedAvgServerOnDevice:
         self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=self.args['t_batch_size'],
                                      shuffle=False, pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
                                      persistent_workers=True, pin_memory_device='cuda:0',prefetch_factor = 8)
+        
+        self.client_model_cache = queue.Queue()
+        self.weight_cache = queue.Queue()
 
     def select_clients(self, global_epoch):
         self.current_selected_client_ids = self.client_sample_stream[global_epoch]
@@ -62,3 +65,29 @@ class FedAvgServerOnDevice:
 
     def get_model_dict(self):
         return {key: value for key, value in self.model.state_dict().items()}
+    
+    def aggregate(self):
+        with torch.no_grad():
+            client_model_cache = []
+            while True:
+                try:
+                    element = self.client_model_cache.get_nowait()
+                    client_model_cache.append(element)
+                except queue.Empty:
+                    break
+            weight_cache = []
+            while True:
+                try:
+                    element = self.weight_cache.get_nowait()
+                    weight_cache.append(element)
+                except queue.Empty:
+                    break
+            weights = torch.tensor(weight_cache) / sum(weight_cache)
+            model_list = [list(delta.values()) for delta in client_model_cache]
+            aggregated_model = [
+                torch.sum(weights * torch.stack(grad, dim=-1), dim=-1)
+                for grad in zip(*model_list)
+            ]
+            averaged_state_dict = OrderedDict(zip(client_model_cache[0].keys(), aggregated_model))
+            self.model.load_state_dict(averaged_state_dict)
+

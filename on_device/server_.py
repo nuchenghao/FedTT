@@ -69,15 +69,16 @@ class ReadThread(threading.Thread):  # 每个线程与一个进程对应
         self.server_lock = server_lock
         self.print_lock = print_lock
         self.physical_device = physical_device
-        self.multiprocessing_shared_queue = multiprocessing.Queue()
         self.keep = keep
 
     def run(self):
-        read_process = ReadProcess(self.physical_device, self.print_lock, self.multiprocessing_shared_queue, self.keep)
-        read_process.start()
-        read_process.join()
+        with multiprocessing.Manager() as manager:
+            multiprocessing_shared_queue = manager.Queue()
+            read_process = ReadProcess(self.physical_device, self.print_lock,multiprocessing_shared_queue, self.keep)
+            read_process.start()
+            read_process.join()
 
-        option, physical_device_id, client_2_server_data = self.multiprocessing_shared_queue.get()
+            option, physical_device_id, client_2_server_data = multiprocessing_shared_queue.get()
         if option == "register":  # 一个注册进程
             with self.server_lock:
                 physical_device = server.all_physical_device_queue[physical_device_id]
@@ -97,6 +98,8 @@ class ReadThread(threading.Thread):  # 每个线程与一个进程对应
         
         elif option == 'upload':
             assert physical_device_id == -1
+            self.server.trainer.client_model_cache.put(client_2_server_data['client_model'])
+            self.server.trainer.weight_cache.put(client_2_server_data['weight'])
             with self.server_lock:
                 server.wait_queue.put('upload')
                 if server.wait_queue.qsize() == server.need_to_uploaded:
@@ -159,11 +162,12 @@ class ReadProcess(multiprocessing.Process):
         self.client_2_server_data = self.client_2_server_data["content"]
         self.client_2_server_data["client_2_server_time"] = client_2_server_time
 
-        if self.client_2_server_data.get('action') == 'register':
+        if self.client_2_server_data.get('action') == 'register': 
             name = self.client_2_server_data.get('name')
             with self.print_lock:
                 console.log(f"Received {name} register request and transmission time is {client_2_server_time}", style="bold yellow")
             self.multiprocessing_shared_queue.put(("register", self.physical_device.physical_device_id, self.client_2_server_data))  # 返回给server修改,第2个参数表示对应的message
+
 
         elif self.client_2_server_data.get('action') == 'check':
             name = self.client_2_server_data.get('name')
@@ -171,16 +175,15 @@ class ReadProcess(multiprocessing.Process):
                 console.log(f"Received {name} check info and transmission time is {client_2_server_time}", style="bold yellow")
             self.multiprocessing_shared_queue.put(('check', self.physical_device.physical_device_id, self.client_2_server_data))
         
+
         elif self.client_2_server_data.get('action') == 'upload':
+            name = self.client_2_server_data.get('name')
             client_id = self.client_2_server_data.get('client_id')
             with self.print_lock:
-                console.log(f"Received {client_id} upload info and transmission time is {client_2_server_time}", style="bold yellow")
+                console.log(f"Received {name}'s {client_id} upload info and transmission time is {client_2_server_time}", style="bold yellow")
             self.multiprocessing_shared_queue.put(('upload', self.physical_device.physical_device_id, self.client_2_server_data))
 
     def run(self):
-        with self.print_lock:
-            console.log(
-                f"start reading {self.physical_device.name}'s upload whose physical device id is {self.physical_device.physical_device_id}" if self.physical_device.name != "" else "A new connection!")
         while True:
             self._read()
             if self._jsonheader_len is None:
@@ -193,9 +196,6 @@ class ReadProcess(multiprocessing.Process):
                     self.process_request()
                 elif self.client_2_server_data is not None: # 这里elif会让_read()再执行一次，从而关闭对向socket
                     break
-        with self.print_lock:
-            console.log(
-                f"finish reading {self.physical_device.name}'s upload whose physical device id is {self.physical_device.physical_device_id}" if self.physical_device.name != "" else "A new connection accepted!")
         if not self.keep and self.physical_device.sock != None:
             try:
                 self.physical_device.sock.close()
@@ -412,7 +412,7 @@ def registerStage():
 
         with server_lock: # 检查是否注册完成
             if server.current_state == "registered":
-                console.log(f"all the devices has registered! The server all_physical_device_queue is {server.all_physical_device_queue}")
+                console.log(f"all the devices has registered! The server all_physical_device_queue is {server.all_physical_device_queue}" ,style="red")
                 break  # 所有设备都已经注册了
     
     
@@ -437,7 +437,7 @@ def registerStage():
     while True:
         with server_lock:
             if server.current_state == "distributed":
-                console.log("distributed to all clients")
+                console.log("distributed to all clients",style="red")
                 break # 全部发送完成
         time.sleep(1)
     
@@ -456,6 +456,7 @@ def registerStage():
 
         with server_lock:
             if server.current_state == "checked":
+                console.log("received all checked info", style="red")
                 break  # 接收完成
     console.rule("start training")
 
@@ -483,7 +484,7 @@ def trainingstage():
         while True:
             with server_lock:
                 if server.current_state == "distributed":
-                    console.log("distributed to all clients")
+                    console.log("distributed to all clients",style="red")
                     break # 全部发送完成
             time.sleep(1)
         # ========================================================
@@ -503,7 +504,14 @@ def trainingstage():
 
             with server_lock:
                 if server.current_state == "uploaded":
+                    console.log("received all the uploaded of current selected clients", style="red")
                     break  # 接收完成
+        # server.trainer.aggregate()
+        server.trainer.model = server.trainer.model.to(server.trainer.device) # 测试之前移动到gpu上
+        accuracy,loss = evaluate("cuda:0", server.trainer.model, server.trainer.testloader)
+        server.trainer.model = server.trainer.model.to("cpu") # 一定要转移到cpu上
+        console.log(f"the {global_epoch} global epoch acc is {accuracy}",style="bold red on white")
+    console.rule("finished training")
     server_2_client_data = {"finished": True,}
     for physical_device in server.all_physical_device_queue:
         write_thread = WriteThread(server_2_client_data, physical_device) # 注意要深拷贝

@@ -332,7 +332,7 @@ def run():
 
         # ============= 与server通信 ===================
         for client_id in client.current_selected_client_ids:
-            client_2_server_data = dict(name=client.name,action="upload",client_id=client_id)
+            client_2_server_data = dict(name=client.name,action="upload",client_id=client_id,  weight = client.client_instances_dict[client_id].train_set_len)
             with client_lock:
                 client.need_to_send_num += 1
             client.need_to_send_queue.put(client_2_server_data)
