@@ -128,6 +128,8 @@ class ReadThread(threading.Thread):
                     self.process_response()
                 else:
                     break
+            if not self.finishedRead:
+                time.sleep(1.0)
 
 
 class MyThread(threading.Thread):  # 每个线程与一个进程对应
@@ -327,6 +329,7 @@ def run():
 
         if client.received_data['finished']:
             break
+        console.rule(f"start {client.received_data['global_epoch']}",style='red')
         client.model = client.received_data['model']
         client.current_epoch_transmission = client.received_data['server_2_client_time']
         client.current_selected_client_ids = client.received_data['current_selected_client_ids']
@@ -342,7 +345,8 @@ def run():
                                         client_id=client_id,  # 训练的client id号
                                         client_model = current_client_instance_model_dict, # 模型参数
                                         weight = client.client_instances_dict[client_id].train_set_len, # 权重
-                                        s2c_training_time = training_time + client.current_epoch_transmission) # 训练时间
+                                        s2c_training_time = training_time + client.current_epoch_transmission, # 下发与训练的时间
+                                        **client.client_instances_dict[client_id].neet_to_send())  # 客户需要发送的信息
             console.log(f"{client_id} has finished training, using {training_time}s")
             with client_lock:
                 client.need_to_send_num += 1

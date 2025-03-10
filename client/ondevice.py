@@ -43,6 +43,9 @@ class BaseClient:
     def participate_once(self):
         self.participation_times += 1
 
+    def neet_to_send(self):
+        return {}
+
 class FedAvgTrainerOnDevice:
     def __init__(
             self,
