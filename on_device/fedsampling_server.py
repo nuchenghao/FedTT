@@ -67,8 +67,20 @@ class Trainer:
                                      shuffle=False, pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
                                      persistent_workers=True, pin_memory_device='cuda:0',prefetch_factor = 8)
         
-        self.client_model_cache = queue.Queue()
+        self.client_grad = queue.Queue()
+        self.client_buffer = queue.Queue()
         self.weight_cache = queue.Queue()
+
+
+        partition_path = PROJECT_DIR / "data" / self.args["dataset"] / "partition.pkl"
+        with open(partition_path, "rb") as f:
+            partition = pickle.load(f)
+        self.data_indices = partition["data_indices"]
+        self.M = max(len(client_data_indices) for client_data_indices in self.data_indices) + 1
+        self.K = sum([len(client_data_indices) for client_data_indices in self.data_indices]) * self.args['KN']
+        self.alpha = 0.5
+        
+
 
     def select_clients(self, global_epoch):
         self.current_selected_client_ids = self.client_sample_stream[global_epoch - 1] #我们的全局从1开始
@@ -80,28 +92,33 @@ class Trainer:
 
     def aggregate(self):
         with torch.no_grad():
-            client_model_cache = []
+            client_grad = []
             while True:
                 try:
-                    element = self.client_model_cache.get_nowait()
-                    client_model_cache.append(element)
+                    element = self.client_grad.get_nowait()
+                    client_grad.append(element)
                 except queue.Empty:
                     break
-            weight_cache = []
+            for name , param in self.model.named_parameters():
+                cache = []
+                for grad in client_grad:
+                    cache.append(grad[name])
+                agg_grad = (1 / self.K) * torch.sum(torch.stack(cache , dim=-1) , dim=-1)
+                param.data -= agg_grad
+            client_buffer = []
             while True:
                 try:
-                    element = self.weight_cache.get_nowait()
-                    weight_cache.append(element)
+                    element = self.client_buffer.get_nowait()
+                    client_buffer.append(element)
                 except queue.Empty:
                     break
-            weights = torch.tensor(weight_cache) / sum(weight_cache)
-            model_list = [list(delta.values()) for delta in client_model_cache]
-            aggregated_model = [
-                torch.sum(weights * torch.stack(grad, dim=-1), dim=-1)
-                for grad in zip(*model_list)
-            ]
-            averaged_state_dict = OrderedDict(zip(client_model_cache[0].keys(), aggregated_model))
-            self.model.load_state_dict(averaged_state_dict)
+            for name , param in self.model.named_buffers():
+                cache = []
+                for buffer in client_buffer:
+                    cache.append(buffer[name])
+                agg_buffer =(1 / self.K) * torch.sum(torch.stack(cache,dim=-1) , dim=-1)
+                param.data = agg_buffer
+            
 
 
 
@@ -167,7 +184,8 @@ class ReadThread(threading.Thread):  # 每个线程与一个进程对应
         elif option == 'upload':
             assert physical_device_id == -1
             with self.server_lock:
-                self.server.trainer.client_model_cache.put(client_2_server_data['client_model']) # 放置模型参数
+                self.server.trainer.client_grad.put(client_2_server_data['client_model']["delta"]) # 放置模型参数
+                self.server.trainer.client_buffer.put(client_2_server_data['client_model']['buffer'])
                 self.server.trainer.weight_cache.put(client_2_server_data['weight']) # 放置权重
                 self.server.globel_epoch_training_time[self.server.current_epoch].append((client_2_server_data['client_id'],client_2_server_data['s2c_training_time'] + client_2_server_data["client_2_server_time"])) # 记录训练时间
                 server.wait_queue.put('upload')
@@ -514,7 +532,8 @@ def registerStage():
         partition = pickle.load(f)
     for physical_device in server.all_physical_device_queue:
         server_2_client_data = {"clients": physical_device.client_ids,
-                                "data_indices":{client_id:partition["data_indices"][client_id].tolist() for client_id in physical_device.client_ids},}
+                                "data_indices":{client_id:partition["data_indices"][client_id].tolist() for client_id in physical_device.client_ids},
+                                "estimator": {"M": server.trainer.M, "alpha": server.trainer.alpha}}
         write_thread = WriteThread(server_2_client_data, physical_device)
         write_thread.start()
     
@@ -553,6 +572,16 @@ def trainingstage():
         server.trainer.select_clients(global_epoch) # 设置本轮被选中的客户
         server.need_to_uploaded = len(server.trainer.current_selected_client_ids)
 
+        # for client_id in range(self.client_num):
+        #     response.append(self.client_instances[client_id].estimator.query())
+        # R = sum(response)
+        # hat_N = max(self.client_num,(R-self.client_num*(1-self.alpha)*self.M/2)/self.alpha)*self.args['client_join_ratio']
+
+        hat_N = 0 
+        for client_id in server.trainer.current_selected_client_ids:
+            hat_N += len(server.trainer.data_indices[client_id])
+        server.trainer.K = hat_N * server.args["KN"]
+        console.log(f"KN: {server.trainer.K / hat_N}")
         device_current_selected_client_ids = {device_id:[] for device_id in range(server.need_connect_device)} #{设备号：[被选中的id]}
         for current_selected_client_id in server.trainer.current_selected_client_ids: # 遍历被选择的客户id，将device_current_selected_client_ids进行统计
             device_current_selected_client_ids[server.client_ids_device[current_selected_client_id]].append(current_selected_client_id)
@@ -567,7 +596,9 @@ def trainingstage():
             server_2_client_data = {"model": server.trainer.get_model_dict(),
                                     "finished": False,
                                     "current_selected_client_ids":device_current_selected_client_ids[physical_device.physical_device_id],
-                                    "global_epoch": global_epoch}
+                                    "global_epoch": global_epoch,
+                                    "KN": server.trainer.K / hat_N,
+                                    "K": server.trainer.K}
             write_thread = WriteThread(server_2_client_data, physical_device) # 注意要深拷贝
             write_thread.start()
         
