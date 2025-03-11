@@ -1,4 +1,4 @@
-algorithm: fedsampling
+algorithm: fedcase
 model: resnet50 # resnet18、
 dataset: cifar100 #cinic10、
 
@@ -12,7 +12,7 @@ seed: 16 # 注意修改data中的seed;
 need_connect_device: 2
 client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 5 
+global_epoch: 10
 local_epoch: 4
 batch_size: 64 # Data batch size for client local training.
 t_batch_size: 256
@@ -29,5 +29,7 @@ save_log: 1 # Non-zero value for saving algorithm running log
 # wandb记录
 wandb: 0
 project: "resnet50_cifar100_on_device"
-experiment_name: "fedsampling"
-KN: 0.8
+experiment_name: "fedcase"
+
+R_S: 0.9
+alpha: 0.0
