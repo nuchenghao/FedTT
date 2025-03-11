@@ -36,6 +36,7 @@ from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
 from utls.dataset import CustomSampler
 from utls.utils import Timer
+from utls.dataset import NeedIndexDataset
 
 
 console = Console()  # 终端输出对象
@@ -62,11 +63,22 @@ class BaseClient:
 
         self.training_time_record = {}
 
+        self.p = 1
+
+        self.batch_training_time = 0.0 # 单位为s
+        self.selected_data_index = None
+        self.metadata = {}
+
+        self.len_OT =self.train_set_len
+
+        self.batch_training_time = 0.0
+
     def participate_once(self):
         self.participation_times += 1
 
     def neet_to_send(self):
-        return {}
+        return {"metadata" : self.metadata, "info" : {"len_OT": self.len_OT, "batch_size" : self.batch_size, "batch_training_time" : self.batch_training_time}}
+
 
 class Trainer:
     def __init__(
@@ -80,40 +92,75 @@ class Trainer:
         self.current_client_instance = None
 
         self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / self.args["dataset"], "train")
-        self.train_sampler = CustomSampler(list(range(len(self.trainset))))
-        self.trainloader = DataLoader(Subset(self.trainset, list(range(len(self.trainset)))), self.args["batch_size"], num_workers=2,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
+        self.trainset = NeedIndexDataset(self.trainset)
+        self.train_sampler = self.trainset.sampler
+        self.trainloader = DataLoader(self.trainset, self.args["batch_size"], num_workers=2,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
                                       sampler=self.train_sampler,)
         self.local_epoch = self.args["local_epoch"]
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
         self.optimizer = None
         self.timer = Timer()  # 训练计时器
+        self.synchronization = {}
+        self.p = 1
     
 
-    def load_dataset(self):
-        self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)  # 在里面实现了深拷贝
-        self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
+    def load_dataset(self,full):
+        if not full:
+            S = int(max(self.synchronization['deadline'] / self.local_epoch / self.current_client_instance.batch_training_time,1.0) * self.current_client_instance.batch_size)
+            if self.current_client_instance.participation_times == 0 or S >= self.current_client_instance.train_set_len:
+                self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)  # 在里面实现了深拷贝
+                self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
+                self.current_client_instance.len_OT = self.current_client_instance.train_set_len
+                self.current_client_instance.selected_data_index = self.current_client_instance.train_set_index
+            else:
+                under_threshold = []
+                over_threshold = []
+                loss_value : np.array = self.trainloader.dataset.get_value(self.current_client_instance.train_set_index)
+                under_threshold = self.current_client_instance.train_set_index[loss_value < self.synchronization['loss_threshold']]
+                over_threshold = self.current_client_instance.train_set_index[loss_value >= self.synchronization['loss_threshold']]
+                L = max(S,len(over_threshold))
+                D_ = np.random.choice(over_threshold, size = min(int(L * self.p) , len(over_threshold)), replace=False) 
+                D__ = np.random.choice(under_threshold , size = min(max(0 , L - len(D_)),len(under_threshold)) , replace = False)
+                selected_index=np.concatenate((D_ , D__))
+                self.trainloader.sampler.set_index(selected_index)  # 在里面实现了深拷贝
+                self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
+                self.current_client_instance.selected_data_index = selected_index
+                self.current_client_instance.len_OT = len(over_threshold)
+        else:
+            self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)  # 在里面实现了深拷贝
+            self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
     
-    def set_parameters(self,model_parameters):
+    def set_parameters(self,model_parameters, synchronization):
         self.model.load_state_dict(model_parameters)
         self.model = self.model.to(self.device) # 转移到gpu上
         self.optimizer = torch.optim.SGD(params=self.model.parameters(),lr=self.args["lr"],momentum=self.args["momentum"],weight_decay=self.args["weight_decay"],)
+        self.synchronization = synchronization
 
-    def start(self,global_epoch, client_instance, model_parameters):
+    def get_batch_training_time(self, training_time):
+        return training_time / (len(self.trainloader.sampler) * self.local_epoch / self.current_client_instance.batch_size) 
+
+
+    def start(self, global_epoch, client_instance, model_parameters,synchronization):
         self.timer.start()
         self.current_client_instance = client_instance
-        self.set_parameters(model_parameters)  # 设置参数
-        self.load_dataset()
+        self.set_parameters(model_parameters,synchronization)  # 设置参数
+        self.load_dataset(global_epoch == 0)
 
         self.local_train() # 本地训练
         self.model = self.model.to("cpu") # 训练完成后放置到CPU上
 
         # 拷贝模型参数
         current_client_instance_model_dict = {key: copy.deepcopy(value) for key, value in self.model.state_dict().items()}  # 一定要深拷贝
+        if global_epoch > 0:
+            loss_sum , min_loss , max_loss_80 = self.trainloader.dataset.get_min_max_value(self.current_client_instance.selected_data_index)
+            self.current_client_instance.metadata['lsum'] = loss_sum
+            self.current_client_instance.metadata['llow'] = min_loss
+            self.current_client_instance.metadata['lhigh'] = max_loss_80
         self.timer.stop()
 
         self.current_client_instance.training_time_record[global_epoch] = self.timer.times[-1]
         self.current_client_instance.participate_once()
-
+        self.current_client_instance.batch_training_time = self.get_batch_training_time(self.current_client_instance.training_time_record[global_epoch])
         # 返回训练后的模型参数，训练时间
         return current_client_instance_model_dict, self.current_client_instance.training_time_record[global_epoch]
 
@@ -128,7 +175,8 @@ class Trainer:
                 targets = targets.to(self.device,non_blocking=True)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets).mean() # 两者会有稍许误差
+                loss = self.criterion(outputs, targets)
+                loss = self.trainloader.dataset.update(loss)
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
@@ -420,6 +468,44 @@ def run():
                 break # 全部发送完成，一轮全局结束
         time.sleep(1) 
     
+
+    # 测试：
+    read_from_server() 
+    console.log("start testing")
+    client.model = client.received_data['model']
+    client.current_epoch_transmission = client.received_data['server_2_client_time']
+    client.current_selected_client_ids = client.received_data['current_selected_client_ids']
+    synchronization = client.received_data["synchronization"]
+    synchronization['deadline'] -= client.current_epoch_transmission
+    console.log(f"need to train {client.current_selected_client_ids} in testing")
+    assert client.current_selected_client_ids == client.client_ids
+    for client_id in client.current_selected_client_ids:
+        assert client_id in client.client_ids , f"{client_id} do not belongs to the device" 
+        current_client_instance_model_dict, training_time = client.trainer.start(client.received_data['global_epoch'],client.client_instances_dict[client_id],client.model, synchronization)
+        
+        client_2_server_data = dict(
+                                    name=client.name, # 设备名称
+                                    action="test", # 行为
+                                    client_id=client_id,  # 训练的client id号
+                                    s2c_training_time = training_time + client.current_epoch_transmission, # 下发与训练的时间
+                                    s2c_time = client.current_epoch_transmission,
+                                    **client.client_instances_dict[client_id].neet_to_send())  # metadata
+        console.log(f"{client_id} has finished training, using {training_time}s")
+        with client_lock:
+            client.need_to_send_num += 1
+        client.need_to_send_queue.put(client_2_server_data)
+
+    console.log(f"{client.name} has finished testing of all selected clients")
+    while True:
+        with client_lock:
+            if client.need_to_send_num == 0:
+                break # 全部发送完成，一轮全局结束
+        time.sleep(1) 
+
+
+
+
+
     # =========== 开始训练 =======================
     while True:
         # ======== 接收 ==============
@@ -434,11 +520,11 @@ def run():
         client.model = client.received_data['model']
         client.current_epoch_transmission = client.received_data['server_2_client_time']
         client.current_selected_client_ids = client.received_data['current_selected_client_ids']
-        
+        synchronization = client.received_data["synchronization"]
         console.log(f"need to train {client.current_selected_client_ids} in global epoch {client.received_data['global_epoch']}")
         for client_id in client.current_selected_client_ids:
             assert client_id in client.client_ids , f"{client_id} do not belongs to the device" 
-            current_client_instance_model_dict, training_time = client.trainer.start(client.received_data['global_epoch'],client.client_instances_dict[client_id],client.model)
+            current_client_instance_model_dict, training_time = client.trainer.start(client.received_data['global_epoch'],client.client_instances_dict[client_id],client.model, synchronization)
             
             client_2_server_data = dict(
                                         name=client.name, # 设备名称
@@ -447,7 +533,8 @@ def run():
                                         client_model = current_client_instance_model_dict, # 模型参数
                                         weight = client.client_instances_dict[client_id].train_set_len, # 权重
                                         s2c_training_time = training_time + client.current_epoch_transmission, # 下发与训练的时间
-                                        **client.client_instances_dict[client_id].neet_to_send())  # 客户需要发送的信息
+                                        s2c_time = client.current_epoch_transmission,
+                                        **client.client_instances_dict[client_id].neet_to_send())  # metadata
             console.log(f"{client_id} has finished training, using {training_time}s")
             with client_lock:
                 client.need_to_send_num += 1
