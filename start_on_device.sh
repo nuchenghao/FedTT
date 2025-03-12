@@ -90,3 +90,18 @@ python3 -u ./on_device/my_server.py --config_path ./on_device/config/loss_dynami
 # python3 -u ./on_device/fedcase_client.py --config_path ./on_device/config/fedcase.yaml --name AGX_2
 
 # python3 -u ./on_device/fedcase_client.py --config_path ./on_device/config/fedcase.yaml --name ORIN_1
+
+
+
+
+
+
+
+
+# python3 -u ./on_device/ode_server.py --config_path ./on_device/config/ode.yaml
+
+# python3 -u ./on_device/ode_client.py --config_path ./on_device/config/ode.yaml --name AGX_1
+
+# python3 -u ./on_device/ode_client.py --config_path ./on_device/config/ode.yaml --name AGX_2
+
+# python3 -u ./on_device/ode_client.py --config_path ./on_device/config/ode.yaml --name ORIN_1
