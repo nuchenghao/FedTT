@@ -36,7 +36,7 @@ from typing import Dict, List
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
 from utls.dataset import CustomSampler
-
+os.environ["WANDB_MODE"] = "offline"
 
 console = Console()  # 终端输出对象
 server_lock = threading.RLock()  # 多线程的stateInServer锁
@@ -47,7 +47,7 @@ print_lock = multiprocessing.RLock()  # 多进程的输出锁
 class Trainer:
     def __init__(self, args):
         self.args = args
-        self.device = 'cuda'
+        self.device = 'cuda:1'
         self.current_time = 0  # 全局时间
         
 
@@ -65,7 +65,7 @@ class Trainer:
         self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
         self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=self.args['t_batch_size'],
                                      shuffle=False, pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
-                                     persistent_workers=True, pin_memory_device='cuda:0',prefetch_factor = 8)
+                                     persistent_workers=True, pin_memory_device=self.device,prefetch_factor = 8)
         
         self.client_model_cache = queue.Queue()
         self.weight_cache = queue.Queue()
@@ -600,7 +600,7 @@ def trainingstage():
         server.trainer.aggregate() # 聚合
 
         server.trainer.model = server.trainer.model.to(server.trainer.device) # 测试之前移动到gpu上
-        accuracy,loss = evaluate("cuda:0", server.trainer.model, server.trainer.testloader)
+        accuracy,loss = evaluate(server.trainer.device, server.trainer.model, server.trainer.testloader)
         server.trainer.model = server.trainer.model.to("cpu") # 一定要转移到cpu上
 
         clientId_time_list = server.globel_epoch_training_time[global_epoch]

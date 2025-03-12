@@ -4,7 +4,7 @@ dataset: cifar100 #cinic10、
 
 
 server_ip: "172.18.101.107"
-server_port: 65432
+server_port: 65431
 
 set_seed: True # True为设置种子，False为性能测试
 seed: 16 # 注意修改data中的seed;
@@ -12,10 +12,10 @@ seed: 16 # 注意修改data中的seed;
 need_connect_device: 2
 client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 2
+global_epoch: 200
 local_epoch: 4
 batch_size: 64 # Data batch size for client local training.
-t_batch_size: 2048
+t_batch_size: 256
 client_eval: False
 
 lr: 0.01 # Learning rate for client local training.
@@ -26,6 +26,6 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 save_log: 1 # Non-zero value for saving algorithm running log 
 
 # wandb记录
-wandb: 0
+wandb: 1
 project: "resnet50_cifar100_on_device"
 experiment_name: "fedavg"

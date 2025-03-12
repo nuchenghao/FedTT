@@ -342,6 +342,13 @@ DATASETS_COLLATE_FN ={
     "domainnet": None
 }
 
+DATASETS_SIZE = {
+    "cinic10": (3, 32, 32),
+    "cifar100": (3, 32, 32),
+    "snli": (1,),
+    "domainnet": (3, 224, 224)
+}
+
 DATA_TRANSFORMS = {
     "cinic10": {
         "train": transforms.Compose([

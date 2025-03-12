@@ -876,7 +876,7 @@
 # ---------------------- dir 0.3 ---------------------
 # ------------------ seed 16 ---------------------------
 
-python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/centralized.yaml
+# python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/centralized.yaml
 
 
 # python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/data.yaml
@@ -908,7 +908,7 @@ python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/d
 
 # ------------------ seed 166 ---------------------------
 
-python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/centralized.yaml
+# python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/centralized.yaml
 
 # python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/data.yaml
 
@@ -938,7 +938,7 @@ python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/d
 
 
 # ------------------ seed 1666 ---------------------------
-python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/centralized.yaml
+# python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/centralized.yaml
 
 # python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_1666_client_30/data.yaml
 
@@ -967,7 +967,7 @@ python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/d
 
 
 # ------------------ seed 16666 ---------------------------
-python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/centralized.yaml
+# python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/centralized.yaml
 
 # python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_16666_client_30/data.yaml
 
@@ -997,7 +997,7 @@ python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/d
 
 
 # ------------------ seed 166666 ---------------------------
-python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/centralized.yaml
+# python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/centralized.yaml
 
 # python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_166666_client_30/data.yaml
 
