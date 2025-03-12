@@ -1,5 +1,5 @@
 algorithm: classify_dynamic_batch
-model: resnet18 # resnet18、
+model: resnet50 # resnet18、
 dataset: cifar100 #cinic10、
 
 
@@ -26,8 +26,8 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
-wandb: 0
-project: "resnet18_cifar100_on_device"
+wandb: 1
+project: "resnet50_cifar100_on_device"
 experiment_name: "classify_dynamic_batch_r3_s1"
 
 

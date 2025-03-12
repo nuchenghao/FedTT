@@ -9,7 +9,7 @@ import time
 import queue
 from rich.console import Console
 from rich.padding import Padding
-import wandb
+import swanlab
 import os
 import pickle
 import multiprocessing
@@ -36,7 +36,6 @@ from typing import Dict, List
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
 from utls.dataset import CustomSampler
-os.environ["WANDB_MODE"] = "offline"
 
 console = Console()  # 终端输出对象
 server_lock = threading.RLock()  # 多线程的stateInServer锁
@@ -381,16 +380,14 @@ class Server:
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
 
-            self.experiment = wandb.init(
+            self.experiment = swanlab.init(
                 project=f"{self.args['project']}",
                 config=self.args,
                 dir=log_dir,
                 reinit=True,
             )
             self.experiment.name = self.args["experiment_name"]
-            self.experiment.log({"acc": 0.0}, step=0)
-            wandb.run.save()
-            
+            self.experiment.log({"acc": 0.0}, step=0)            
     
     
     def add_device(self):

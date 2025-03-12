@@ -9,7 +9,7 @@ import time
 import queue
 from rich.console import Console
 from rich.padding import Padding
-import wandb
+import swanlab
 import os
 import pickle
 import multiprocessing
@@ -481,7 +481,7 @@ class Server:
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
 
-            self.experiment = wandb.init(
+            self.experiment = swanlab.init(
                 project=f"{self.args['project']}",
                 config=self.args,
                 dir=log_dir,
@@ -489,7 +489,6 @@ class Server:
             )
             self.experiment.name = self.args["experiment_name"]
             self.experiment.log({"acc": 0.0}, step=0)
-            wandb.run.save()
             
     
     
