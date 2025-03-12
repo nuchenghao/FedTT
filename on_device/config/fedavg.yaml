@@ -1,5 +1,5 @@
 algorithm: fedavg
-model: resnet50 # resnet18、
+model: resnet18 # resnet18、
 dataset: cifar100 #cinic10、
 
 
@@ -27,5 +27,5 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "resnet50_cifar100_on_device"
+project: "resnet18_cifar100_on_device"
 experiment_name: "fedavg"
