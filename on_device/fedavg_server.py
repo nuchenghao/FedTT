@@ -39,6 +39,8 @@ from utls.dataset import CustomSampler
 
 console = Console()  # 终端输出对象
 server_lock = threading.RLock()  # 多线程的stateInServer锁
+write_finish = threading.Event()
+read_finish = threading.Event() 
 print_lock = multiprocessing.RLock()  # 多进程的输出锁
 
 
@@ -294,9 +296,10 @@ class WriteThread(threading.Thread):  # 每个线程与一个进程对应
                 physical_device = server.all_physical_device_queue[physical_device_id]
                 assert physical_device.physical_device_id == physical_device_id, f"the physical device id {physical_device_id} is not equal to physical_device.physical_device_id {physical_device.physical_device_id}"
                 server.wait_queue.put("distribute")
-                if server.wait_queue.qsize() == server.need_connect_device:
+                if server.wait_queue.qsize() == server.need_distribute_device:
                     server.current_state = 'distributed' 
                     server.wait_queue.queue.clear()
+                    write_finish.set()
 
 class WriteProcess(multiprocessing.Process):
     def __init__(self, content_server_2_client, physical_device, print_lock, multiprocessing_shared_queue):
@@ -351,6 +354,7 @@ class Server:
         self.args = args
         self.global_time = 0 # 记录全局时间 
         self.need_connect_device = self.args["need_connect_device"] 
+        self.need_distribute_device = 0
         self.current_device_nums = 0
         self.tot_client_nums = self.args["client_num"]
         self.client_ids = list(range(self.tot_client_nums)) # 所有客户的client_id
@@ -382,11 +386,11 @@ class Server:
 
             self.experiment = swanlab.init(
                 project=f"{self.args['project']}",
+                experiment_name=self.args["experiment_name"],
                 config=self.args,
                 dir=log_dir,
                 reinit=True,
             )
-            self.experiment.name = self.args["experiment_name"]
             self.experiment.log({"acc": 0.0}, step=0)            
     
     
@@ -478,7 +482,7 @@ def registerStage():
     global server
     # 开始注册
     while True:
-        events = server.socket_manager.sel.select(timeout=1)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
+        events = server.socket_manager.sel.select(timeout=0)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
         for key, mask in events:
             if key.data is None:  # 服务端的listening socket；意味着有一个新的连接到来，需要注册
                 physical_device:physicalDevice = server.socket_manager.accept_wrapper(key.fileobj, physical_device_id = server.current_device_nums)
@@ -509,22 +513,26 @@ def registerStage():
     partition_path = PROJECT_DIR / "data" / server.args["dataset"] / "partition.pkl"
     with open(partition_path, "rb") as f:
         partition = pickle.load(f)
+    with server_lock:
+        server.need_distribute_device = server.need_connect_device
     for physical_device in server.all_physical_device_queue:
         server_2_client_data = {"clients": physical_device.client_ids,
                                 "data_indices":{client_id:partition["data_indices"][client_id].tolist() for client_id in physical_device.client_ids},}
         write_thread = WriteThread(server_2_client_data, physical_device)
         write_thread.start()
     
-    while True:
-        with server_lock:
-            if server.current_state == "distributed":
-                console.log("distributed to all clients",style="red")
-                break # 全部发送完成
-        time.sleep(1)
+    write_finish.wait()
+    write_finish.clear()
+    # while True:
+    #     with server_lock:
+    #         if server.current_state == "distributed":
+    #             console.log("distributed to all clients",style="red")
+    #             break # 全部发送完成
+    #     time.sleep(0.5)
     
     # 准备接收check信息
     while True:
-        events = server.socket_manager.sel.select(timeout=1)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
+        events = server.socket_manager.sel.select(timeout=0)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
         for key, mask in events:
             if key.data is None:  # 服务端的listening socket；意味着有一个新的连接到来，需要注册
                 server.socket_manager.accept_wrapper(key.fileobj)
@@ -556,6 +564,14 @@ def trainingstage():
         console.log(f"current selected client ids is {device_current_selected_client_ids}")
 
 
+        with server_lock:
+            server.need_distribute_device = 0
+            for physical_device in server.all_physical_device_queue:
+                if len(device_current_selected_client_ids[physical_device.physical_device_id]) == 0:
+                    continue
+                server.need_distribute_device += 1
+
+
         # ============= 下发========================
         for physical_device in server.all_physical_device_queue:
             if len(device_current_selected_client_ids[physical_device.physical_device_id]) == 0:
@@ -568,17 +584,19 @@ def trainingstage():
             write_thread = WriteThread(server_2_client_data, physical_device) # 注意要深拷贝
             write_thread.start()
         
-        while True:
-            with server_lock:
-                if server.current_state == "distributed":
-                    console.log("distributed to all clients",style="red")
-                    break # 全部发送完成
-            time.sleep(1)
+        write_finish.wait()
+        write_finish.clear()
+        # while True:
+        #     with server_lock:
+        #         if server.current_state == "distributed":
+        #             console.log("distributed to all clients",style="red")
+        #             break # 全部发送完成
+        #     time.sleep(0.5)
         # ========================================================
         
         # 准备接收uploaded信息
         while True:
-            events = server.socket_manager.sel.select(timeout=1)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
+            events = server.socket_manager.sel.select(timeout=0)  # 非阻塞调用,立即返回可用的文件描述符,而不等待
             for key, mask in events:
                 if key.data is None:  # 服务端的listening socket；意味着有一个新的连接到来，需要注册
                     server.socket_manager.accept_wrapper(key.fileobj)
@@ -616,12 +634,16 @@ def trainingstage():
     for physical_device in server.all_physical_device_queue:
         write_thread = WriteThread(server_2_client_data, physical_device) # 注意要深拷贝
         write_thread.start()
-    while True:
-        with server_lock:
-            if server.current_state == "distributed":
-                console.log("distributed to all clients")
-                break # 全部发送完成
-        time.sleep(1)
+    
+
+    write_finish.wait()
+    write_finish.clear()
+    # while True:
+    #     with server_lock:
+    #         if server.current_state == "distributed":
+    #             console.log("distributed to all clients")
+    #             break # 全部发送完成
+    #     time.sleep(0.5)
 
 
 
