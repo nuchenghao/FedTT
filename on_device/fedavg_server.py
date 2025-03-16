@@ -477,6 +477,19 @@ def split_list_to_clients(lst, num_clients):
   
     return divided
 
+def split_numbers():
+    # 生成0-29的列表
+    numbers = list(range(30))
+  
+    # 打乱顺序
+    random.shuffle(numbers)
+  
+    # 分割列表
+    return [
+        numbers[:12],      # 第一组12个
+        numbers[12:24],    # 第二组12个
+        numbers[24:]       # 第三组6个
+    ]
 
 def registerStage():
     global server
@@ -502,7 +515,8 @@ def registerStage():
     
     
     # 下发数据集的划分与每个设备上的client的分配
-    client_splits = split_list_to_clients(server.client_ids, server.need_connect_device)
+    # client_splits = split_list_to_clients(server.client_ids, server.need_connect_device)
+    client_splits = split_numbers()
     for i in range(server.need_connect_device):
         console.log(f"{client_splits[i]}")
         server.all_physical_device_queue[i].client_ids = client_splits[i]

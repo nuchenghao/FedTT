@@ -12,7 +12,7 @@ seed: 16 # 注意修改data中的seed;
 need_connect_device: 3
 client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 5
+global_epoch: 300
 local_epoch: 4
 batch_size: 64 # Data batch size for client local training.
 t_batch_size: 256
