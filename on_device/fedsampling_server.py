@@ -40,6 +40,8 @@ from utls.dataset import CustomSampler
 
 console = Console()  # 终端输出对象
 server_lock = threading.RLock()  # 多线程的stateInServer锁
+write_finish = threading.Event()
+read_finish = threading.Event() 
 print_lock = multiprocessing.RLock()  # 多进程的输出锁
 
 
@@ -47,7 +49,7 @@ print_lock = multiprocessing.RLock()  # 多进程的输出锁
 class Trainer:
     def __init__(self, args):
         self.args = args
-        self.device = 'cuda'
+        self.device = 'cuda:1'
         self.current_time = 0  # 全局时间
         
 
@@ -65,7 +67,7 @@ class Trainer:
         self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
         self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=self.args['t_batch_size'],
                                      shuffle=False, pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
-                                     persistent_workers=True, pin_memory_device='cuda:0',prefetch_factor = 8)
+                                     persistent_workers=True, pin_memory_device=self.device,prefetch_factor = 8)
         
         self.client_grad = queue.Queue()
         self.client_buffer = queue.Queue()
@@ -313,9 +315,10 @@ class WriteThread(threading.Thread):  # 每个线程与一个进程对应
                 physical_device = server.all_physical_device_queue[physical_device_id]
                 assert physical_device.physical_device_id == physical_device_id, f"the physical device id {physical_device_id} is not equal to physical_device.physical_device_id {physical_device.physical_device_id}"
                 server.wait_queue.put("distribute")
-                if server.wait_queue.qsize() == server.need_connect_device:
+                if server.wait_queue.qsize() == server.need_distribute_device:
                     server.current_state = 'distributed' 
                     server.wait_queue.queue.clear()
+                    write_finish.set()
 
 class WriteProcess(multiprocessing.Process):
     def __init__(self, content_server_2_client, physical_device, print_lock, multiprocessing_shared_queue):
@@ -401,11 +404,11 @@ class Server:
 
             self.experiment = swanlab.init(
                 project=f"{self.args['project']}",
+                experiment_name=self.args["experiment_name"],
                 config=self.args,
                 dir=log_dir,
                 reinit=True,
             )
-            self.experiment.name = self.args["experiment_name"]
             self.experiment.log({"acc": 0.0}, step=0)
             
     
@@ -493,6 +496,19 @@ def split_list_to_clients(lst, num_clients):
   
     return divided
 
+def split_numbers():
+    # 生成0-29的列表
+    numbers = list(range(30))
+  
+    # 打乱顺序
+    random.shuffle(numbers)
+  
+    # 分割列表
+    return [
+        numbers[:12],      # 第一组12个
+        numbers[12:24],    # 第二组12个
+        numbers[24:]       # 第三组6个
+    ]
 
 def registerStage():
     global server
@@ -518,7 +534,8 @@ def registerStage():
     
     
     # 下发数据集的划分与每个设备上的client的分配
-    client_splits = split_list_to_clients(server.client_ids, server.need_connect_device)
+    # client_splits = split_list_to_clients(server.client_ids, server.need_connect_device)
+    client_splits = split_numbers()
     for i in range(server.need_connect_device):
         console.log(f"{client_splits[i]}")
         server.all_physical_device_queue[i].client_ids = client_splits[i]
@@ -529,19 +546,23 @@ def registerStage():
     partition_path = PROJECT_DIR / "data" / server.args["dataset"] / "partition.pkl"
     with open(partition_path, "rb") as f:
         partition = pickle.load(f)
+    with server_lock:
+        server.need_distribute_device = server.need_connect_device
     for physical_device in server.all_physical_device_queue:
         server_2_client_data = {"clients": physical_device.client_ids,
                                 "data_indices":{client_id:partition["data_indices"][client_id].tolist() for client_id in physical_device.client_ids},
                                 "estimator": {"M": server.trainer.M, "alpha": server.trainer.alpha}}
         write_thread = WriteThread(server_2_client_data, physical_device)
         write_thread.start()
-    
-    while True:
-        with server_lock:
-            if server.current_state == "distributed":
-                console.log("distributed to all clients",style="red")
-                break # 全部发送完成
-        time.sleep(1)
+
+    write_finish.wait()
+    write_finish.clear()
+    # while True:
+    #     with server_lock:
+    #         if server.current_state == "distributed":
+    #             console.log("distributed to all clients",style="red")
+    #             break # 全部发送完成
+    #     time.sleep(1)
     
     # 准备接收check信息
     while True:
@@ -586,6 +607,12 @@ def trainingstage():
             device_current_selected_client_ids[server.client_ids_device[current_selected_client_id]].append(current_selected_client_id)
         console.log(f"current selected client ids is {device_current_selected_client_ids}")
 
+        with server_lock:
+            server.need_distribute_device = 0
+            for physical_device in server.all_physical_device_queue:
+                if len(device_current_selected_client_ids[physical_device.physical_device_id]) == 0:
+                    continue
+                server.need_distribute_device += 1
 
         # ============= 下发========================
         for physical_device in server.all_physical_device_queue:
@@ -600,13 +627,15 @@ def trainingstage():
                                     "K": server.trainer.K}
             write_thread = WriteThread(server_2_client_data, physical_device) # 注意要深拷贝
             write_thread.start()
-        
-        while True:
-            with server_lock:
-                if server.current_state == "distributed":
-                    console.log("distributed to all clients",style="red")
-                    break # 全部发送完成
-            time.sleep(1)
+
+        write_finish.wait()
+        write_finish.clear()
+        # while True:
+        #     with server_lock:
+        #         if server.current_state == "distributed":
+        #             console.log("distributed to all clients",style="red")
+        #             break # 全部发送完成
+        #     time.sleep(1)
         # ========================================================
         
         # 准备接收uploaded信息
@@ -630,7 +659,7 @@ def trainingstage():
         server.trainer.aggregate() # 聚合
 
         server.trainer.model = server.trainer.model.to(server.trainer.device) # 测试之前移动到gpu上
-        accuracy,loss = evaluate("cuda:0", server.trainer.model, server.trainer.testloader)
+        accuracy,loss = evaluate(server.trainer.device, server.trainer.model, server.trainer.testloader)
         server.trainer.model = server.trainer.model.to("cpu") # 一定要转移到cpu上
 
         clientId_time_list = server.globel_epoch_training_time[global_epoch]
@@ -649,12 +678,15 @@ def trainingstage():
     for physical_device in server.all_physical_device_queue:
         write_thread = WriteThread(server_2_client_data, physical_device) # 注意要深拷贝
         write_thread.start()
-    while True:
-        with server_lock:
-            if server.current_state == "distributed":
-                console.log("distributed to all clients")
-                break # 全部发送完成
-        time.sleep(1)
+
+    write_finish.wait()
+    write_finish.clear()
+    # while True:
+    #     with server_lock:
+    #         if server.current_state == "distributed":
+    #             console.log("distributed to all clients")
+    #             break # 全部发送完成
+    #     time.sleep(1)
 
 
 

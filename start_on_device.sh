@@ -18,7 +18,7 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_
 
 
 
-python3 -u ./on_device/my_server.py --config_path ./on_device/config/classify_dynamic_batch_r3_s1.yaml
+# python3 -u ./on_device/my_server.py --config_path ./on_device/config/classify_dynamic_batch_r3_s1.yaml
 
 # python3 -u ./on_device/my_client.py --config_path ./on_device/config/classify_dynamic_batch_r3_s1.yaml --name AGX_1
 
@@ -65,7 +65,7 @@ python3 -u ./on_device/my_server.py --config_path ./on_device/config/classify_dy
 
 
 
-# python3 -u ./on_device/fedsampling_server.py --config_path ./on_device/config/fedsampling.yaml
+python3 -u ./on_device/fedsampling_server.py --config_path ./on_device/config/fedsampling.yaml
 
 # python3 -u ./on_device/fedsampling_client.py --config_path ./on_device/config/fedsampling.yaml --name AGX_1
 

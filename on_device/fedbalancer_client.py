@@ -539,7 +539,7 @@ def run():
                                         action="upload", # 行为
                                         client_id=client_id,  # 训练的client id号
                                         client_model = current_client_instance_model_dict, # 模型参数
-                                        weight = client.client_instances_dict[client_id].train_set_len, # 权重
+                                        weight = len(client.client_instances_dict[client_id].selected_data_index), # 权重
                                         s2c_training_time = training_time + client.current_epoch_transmission, # 下发与训练的时间
                                         s2c_time = client.current_epoch_transmission,
                                         **client.client_instances_dict[client_id].neet_to_send())  # metadata
