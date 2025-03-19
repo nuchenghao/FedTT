@@ -41,6 +41,8 @@ from utls.dataset import NeedIndexDataset
 
 console = Console()  # 终端输出对象
 client_lock = threading.RLock()  # 多线程的client访问锁
+read_finish = threading.Event()
+write_finish = threading.Event()
 print_lock = multiprocessing.RLock()  # 多进程的输出锁
 
 
@@ -276,8 +278,6 @@ class ReadThread(threading.Thread):
                     self.process_response()
                 else:
                     break
-            if not self.finishedRead:
-                time.sleep(1.0)
 
 
 class MyThread(threading.Thread):  # 每个线程与一个进程对应
@@ -297,6 +297,8 @@ class MyThread(threading.Thread):  # 每个线程与一个进程对应
             write_process.join()
             with self.client_lock:
                 self.client.need_to_send_num -= 1
+                if self.client.need_to_send_num == 0:
+                    write_finish.set()
 
             
 
@@ -461,12 +463,15 @@ def run():
     client_2_server_data = dict(name=client.name,action= "check") 
     with client_lock:
         client.need_to_send_num += 1
+        write_finish.clear() 
     client.need_to_send_queue.put(client_2_server_data)
-    while True:
-        with client_lock:
-            if client.need_to_send_num == 0:
-                break # 全部发送完成，一轮全局结束
-        time.sleep(1) 
+    write_finish.wait()
+    write_finish.clear() 
+    # while True:
+    #     with client_lock:
+    #         if client.need_to_send_num == 0:
+    #             break # 全部发送完成，一轮全局结束
+    #     time.sleep(1) 
     
 
     # 测试：
@@ -493,14 +498,17 @@ def run():
         console.log(f"{client_id} has finished training, using {training_time}s")
         with client_lock:
             client.need_to_send_num += 1
+            write_finish.clear()
         client.need_to_send_queue.put(client_2_server_data)
 
     console.log(f"{client.name} has finished testing of all selected clients")
-    while True:
-        with client_lock:
-            if client.need_to_send_num == 0:
-                break # 全部发送完成，一轮全局结束
-        time.sleep(1) 
+    write_finish.wait()
+    write_finish.clear()
+    # while True:
+    #     with client_lock:
+    #         if client.need_to_send_num == 0:
+    #             break # 全部发送完成，一轮全局结束
+    #     time.sleep(1) 
 
 
 
@@ -531,22 +539,25 @@ def run():
                                         action="upload", # 行为
                                         client_id=client_id,  # 训练的client id号
                                         client_model = current_client_instance_model_dict, # 模型参数
-                                        weight = client.client_instances_dict[client_id].train_set_len, # 权重
+                                        weight = len(client.client_instances_dict[client_id].selected_data_index), # 权重
                                         s2c_training_time = training_time + client.current_epoch_transmission, # 下发与训练的时间
                                         s2c_time = client.current_epoch_transmission,
                                         **client.client_instances_dict[client_id].neet_to_send())  # metadata
             console.log(f"{client_id} has finished training, using {training_time}s")
             with client_lock:
                 client.need_to_send_num += 1
+                write_finish.clear()
             client.need_to_send_queue.put(client_2_server_data)
 
         console.log(f"{client.name} has finished local training of all selected clients")
 
-        while True:
-            with client_lock:
-                if client.need_to_send_num == 0:
-                    break # 全部发送完成，一轮全局结束
-            time.sleep(1) 
+        write_finish.wait()
+        write_finish.clear()
+        # while True:
+        #     with client_lock:
+        #         if client.need_to_send_num == 0:
+        #             break # 全部发送完成，一轮全局结束
+        #     time.sleep(1) 
         # =============================
 
 
