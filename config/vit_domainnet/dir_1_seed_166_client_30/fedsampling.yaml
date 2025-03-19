@@ -26,3 +26,4 @@ wandb: 1
 project: "vit_domainnet_166_dir_1"
 experiment_name: "fedsampling"
 KN: 0.8
+device: "cuda:0"

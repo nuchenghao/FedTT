@@ -25,3 +25,4 @@ save_log: 1 # Non-zero value for saving algorithm running log
 wandb: 1
 project: "resnet50_cifar100_16_dir_3"
 experiment_name: "fedbalancer"
+device: "cuda:0"

@@ -26,3 +26,4 @@ wandb: 1
 project: "resnet50_cifar100_1666_dir_3"
 experiment_name: "fedsampling"
 KN: 0.8
+device: "cuda:0"

@@ -25,3 +25,4 @@ save_log: 1 # Non-zero value for saving algorithm running log
 wandb: 1
 project: "biRNN_snli_16666_dir_3"
 experiment_name: "fedavg"
+device: "cuda:0"

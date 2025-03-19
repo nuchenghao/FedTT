@@ -76,7 +76,7 @@ class FedCaSeServer(FedAvgServer):
         self.train_sampler = self.trainset.sampler
         self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
                                       pin_memory=True, num_workers=4 , collate_fn = DATASETS_COLLATE_FN[self.args['dataset']] , persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device='cuda:0',prefetch_factor = 8)
+                                      sampler=self.train_sampler, pin_memory_device=self.device,prefetch_factor = 8)
         self.cuda_0_trainer.trainloader = self.trainloader
 
         self.F = [0 for i in range(self.client_num)]
@@ -158,7 +158,7 @@ class FedCaSeServer(FedAvgServer):
             self.logger.log(f"current selected clients: {self.current_selected_client_ids}")
             training_time = self.train_one_round( E + 1 )
             self.current_time += training_time
-            accuracy,global_loss = evaluate(torch.device("cuda:0"), self.model, self.testloader)
+            accuracy,global_loss = evaluate(torch.device(self.device), self.model, self.testloader)
             self.logger.log(f"Finished training!!! Current global epoch training time: {training_time}.",
                             f"The global time is {self.current_time}",
                             f"The Global model accuracy is {accuracy:.3f}%.")

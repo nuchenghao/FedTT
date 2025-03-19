@@ -45,7 +45,7 @@ class ODEServer(FedAvgServer):
         self.train_sampler = self.trainset.sampler
         self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
                                       pin_memory=True, num_workers=4, collate_fn = DATASETS_COLLATE_FN[self.args['dataset']] , persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device='cuda:0',prefetch_factor = 8)
+                                      sampler=self.train_sampler, pin_memory_device=self.device,prefetch_factor = 8)
         self.cuda_0_trainer.trainloader = self.trainloader
 
 

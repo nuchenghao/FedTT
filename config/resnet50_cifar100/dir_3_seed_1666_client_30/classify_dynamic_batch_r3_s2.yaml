@@ -31,3 +31,4 @@ experiment_name: "classify_dynamic_batch_r3_s2"
 r: 0.3
 start: 0.2
 max_gpu_memory_GB: 22
+device: "cuda:0"

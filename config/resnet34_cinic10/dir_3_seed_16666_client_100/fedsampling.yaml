@@ -26,3 +26,4 @@ wandb: 1
 project: "resnet34_cinic10_16666_dir_3"
 experiment_name: "fedsampling"
 KN: 0.8
+device: "cuda:0"

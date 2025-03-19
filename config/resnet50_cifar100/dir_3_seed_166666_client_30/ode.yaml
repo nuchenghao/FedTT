@@ -29,3 +29,4 @@ experiment_name: "ODE"
 
 labels_per_client: 1.0
 update_batch_size: 48
+device: "cuda:0"

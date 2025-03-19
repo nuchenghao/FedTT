@@ -29,3 +29,4 @@ experiment_name: "fedcase"
 
 R_S: 0.9
 alpha: 0.0
+device: "cuda:0"

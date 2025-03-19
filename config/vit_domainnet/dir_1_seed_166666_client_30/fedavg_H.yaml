@@ -25,3 +25,4 @@ save_log: 1 # Non-zero value for saving algorithm running log
 wandb: 1
 project: "vit_domainnet_166666_dir_1"
 experiment_name: "fedavg_H"
+device: "cuda:0"

@@ -105,7 +105,7 @@ class myFed(FedAvgTrainer):
                 self.train_event.wait() # 开始/ 等待上一轮训练流结束
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
-                with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
                         loss_global[total_correct:total_correct + len(targets_raw)] = self.criterion(outputs,self.targets[cnt])
@@ -128,7 +128,7 @@ class myFed(FedAvgTrainer):
                     self.train_event.wait()
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
-                    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                    with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
                             loss_global[total_correct:total_correct + len(targets_raw)] = self.criterion(outputs,self.targets[cnt])
@@ -182,7 +182,7 @@ class myFed(FedAvgTrainer):
                 self.train_event.wait() # 开始/ 等待上一轮训练流结束
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
-                with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
                         loss_global[total_correct:total_correct + len(targets_raw)] = self.criterion(outputs,self.targets[cnt])
@@ -220,7 +220,7 @@ class myFed(FedAvgTrainer):
                     self.train_event.wait()
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
-                    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                    with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
                             loss_global[total_correct:total_correct + len(targets_raw)] = self.criterion(outputs , self.targets[cnt])
@@ -269,7 +269,7 @@ class myFed(FedAvgTrainer):
                 self.train_event.wait() # 开始/ 等待上一轮训练流结束
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
-                with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
                         _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
@@ -293,7 +293,7 @@ class myFed(FedAvgTrainer):
                     self.train_event.wait()
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
-                    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                    with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
                             _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
@@ -341,7 +341,7 @@ class myFed(FedAvgTrainer):
                 self.train_event.wait()
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
-                with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
                         _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
@@ -378,7 +378,7 @@ class myFed(FedAvgTrainer):
                     self.train_event.wait()
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
-                    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                    with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
                             _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
@@ -433,7 +433,7 @@ class myFed(FedAvgTrainer):
                 self.train_event.wait()
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
-                with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
                         _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
@@ -469,7 +469,7 @@ class myFed(FedAvgTrainer):
                     self.train_event.wait()
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
-                    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                    with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
                             _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
@@ -525,7 +525,7 @@ class myFed(FedAvgTrainer):
                 self.train_event.wait() # 开始/ 等待上一轮训练流结束
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
-                with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
                         loss_global[total_correct:total_correct + len(targets_raw)] = self.criterion(outputs,self.targets[cnt])
@@ -561,7 +561,7 @@ class myFed(FedAvgTrainer):
                     self.train_event.wait()
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
-                    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
+                    with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
                             loss_global[total_correct:total_correct + len(targets_raw)] = self.criterion(outputs , self.targets[cnt])

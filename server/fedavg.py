@@ -43,6 +43,7 @@ class FedAvgServer:
             client_type=BaseClient
     ):
         self.args = args  # 配置文件
+        self.device = self.args['device']
         self.algorithm = args["algorithm"]
         self.current_time = 0  # 全局时间
         with open(PROJECT_DIR / "data" / self.args["dataset"] / "args.json", "r") as f:
@@ -104,8 +105,7 @@ class FedAvgServer:
         self.client_to_server=queue.Queue()
 
         # TODO ------------init model(s) parameters-------
-        torch.cuda.set_device("cuda:0")
-        self.device = 'cuda:0'  # 全局模型的device默认为cuda:0
+        torch.cuda.set_device(self.device)
         self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
         self.model = MODEL_DICT[self.args["model"]](self.data_num_classes).to(self.device)
         if self.args["model"] == 'vit':
@@ -118,14 +118,14 @@ class FedAvgServer:
         self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
         self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=self.args['t_batch_size'],
                                      shuffle=False, pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
-                                     persistent_workers=True, pin_memory_device='cuda:0',prefetch_factor = 8)
+                                     persistent_workers=True, pin_memory_device=self.device,prefetch_factor = 8)
 
 
         self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "train")
         self.train_sampler = CustomSampler(list(range(len(self.trainset))))
         self.trainloader = DataLoader(Subset(self.trainset, list(range(len(self.trainset)))), self.args["batch_size"],
                                       pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device='cuda:0',prefetch_factor = 8)
+                                      sampler=self.train_sampler, pin_memory_device=self.device,prefetch_factor = 8)
 
 
         # TODO------------------------优化器和学习率调整器----------------------------------
@@ -142,7 +142,7 @@ class FedAvgServer:
         self.cuda_0_trainer = trainer_type(self.device, deepcopy(self.model), self.trainloader, self.testloader,
                                            self.args)
 
-        self.logger.log("cuda:0 has been initialized")
+        self.logger.log(f"{self.device} has been initialized")
 
     def train(self):
         for E in range(self.args["global_epoch"]):
@@ -151,7 +151,7 @@ class FedAvgServer:
             self.logger.log(f"current selected clients: {self.current_selected_client_ids}")
             training_time = self.train_one_round( E + 1 )
             self.current_time += training_time
-            accuracy,loss = evaluate(torch.device("cuda:0"), self.model, self.testloader)
+            accuracy,loss = evaluate(torch.device(self.device), self.model, self.testloader)
             self.logger.log(f"Finished training!!! Current global epoch training time: {training_time}.",
                             f"The global time is {self.current_time}",
                             f"The Global model accuracy is {accuracy:.3f}%.")

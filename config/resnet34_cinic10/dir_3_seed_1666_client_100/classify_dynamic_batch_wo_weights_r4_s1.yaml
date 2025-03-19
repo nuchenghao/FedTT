@@ -31,3 +31,4 @@ experiment_name: "classify_dynamic_batch_wo_weights_r4_s1"
 r: 0.4
 start: 0.1
 max_gpu_memory_GB: 22
+device: "cuda:0"

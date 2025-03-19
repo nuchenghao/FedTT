@@ -20,3 +20,4 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 wandb: 1
 project: "resnet50_cifar100_166666_dir_3"
 experiment_name: "centralized training"
+device: "cuda:0"
