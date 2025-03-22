@@ -125,7 +125,7 @@ class FedAvgServer:
         self.train_sampler = CustomSampler(list(range(len(self.trainset))))
         self.trainloader = DataLoader(Subset(self.trainset, list(range(len(self.trainset)))), self.args["batch_size"],
                                       pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device=self.device,prefetch_factor = 8)
+                                      sampler=self.train_sampler, pin_memory_device=self.device,prefetch_factor = 16)
 
 
         # TODO------------------------优化器和学习率调整器----------------------------------
