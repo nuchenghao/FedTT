@@ -6,7 +6,7 @@
 
 # python3 -u ./centralized/resnet34_cinic10.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/centralized.yaml
 
-# python3 -u ./data/generate_data.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/data.yaml
+python3 -u ./data/generate_data.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/data.yaml
 
 # python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg.yaml
 
@@ -61,6 +61,61 @@
 
 
 
+
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r1_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r2_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r4_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r5_s0.yaml
+
+
+
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss_r1_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss_r2_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss_r4_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss_r5_s0.yaml
+
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_wo_weights_r3_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/loss_dynamic_batch_global_loss_wo_weights_r3_s0.yaml
+
+
+
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_128.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_128.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_160.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_160.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_192.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_192.yaml
+python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_224.yaml
+python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_224.yaml
+python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_256.yaml
+python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_256.yaml
+python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_512.yaml
+python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_512.yaml
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/random_select.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/random_select400.yaml
+
+
+
+
+# python3 -u ./server/fedprox.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedprox.yaml
+# python3 -u ./server/fedprox.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedprox_my.yaml
+
+
+
+
+
+
+# python3 -u ./server/fednova.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fednova.yaml
+# python3 -u ./server/fednova.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fednova_my.yaml
 
 
 
@@ -442,6 +497,47 @@
 
 
 
+
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r1_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r2_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r4_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r5_s0.yaml
+
+
+
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/loss_dynamic_batch_global_loss_r1_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/loss_dynamic_batch_global_loss_r2_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/loss_dynamic_batch_global_loss_r4_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/loss_dynamic_batch_global_loss_r5_s0.yaml
+
+
+
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_wo_weights_r3_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/loss_dynamic_batch_global_loss_wo_weights_r3_s0.yaml
+
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r3_s0_96.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/woparallel_96.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r3_s0_128.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/woparallel_128.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r3_s0_160.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/woparallel_160.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r3_s0_192.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/woparallel_192.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r3_s0_256.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/woparallel_256.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r3_s0_512.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/woparallel_512.yaml
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/random_select.yaml
 
 
 
@@ -891,7 +987,7 @@
 # python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/centralized.yaml
 
 
-python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/data.yaml
+# python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/data.yaml
 
 # python3 -u ./server/fedavg.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/fedavg.yaml
 
@@ -900,7 +996,7 @@ python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_se
 # python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/classify_dynamic_batch_r3_s1.yaml
 # python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/classify_dynamic_batch_r3_s0.yaml
 # python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/loss_dynamic_batch_global_loss_r3_s1.yaml
-python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/loss_dynamic_batch_global_loss_r3_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/loss_dynamic_batch_global_loss_r3_s0.yaml
 
 
 # python3 -u ./server/fedbalancer.py --config_path ./config/vit_domainnet/dir_1_seed_16_client_30/fedbalancer.yaml
@@ -924,7 +1020,7 @@ python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_16_cli
 
 # python3 -u ./centralized/vit_domainnet.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/centralized.yaml
 
-python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/data.yaml
+# python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/data.yaml
 
 # python3 -u ./server/fedavg.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/fedavg.yaml
 
@@ -932,9 +1028,9 @@ python3 -u ./data/generate_data.py --config_path ./config/vit_domainnet/dir_1_se
 
 
 # python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/classify_dynamic_batch_r3_s1.yaml
-python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/classify_dynamic_batch_r3_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/classify_dynamic_batch_r3_s0.yaml
 # python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/loss_dynamic_batch_global_loss_r3_s1.yaml
-python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/loss_dynamic_batch_global_loss_r3_s0.yaml
+# python3 -u ./server/my.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/loss_dynamic_batch_global_loss_r3_s0.yaml
 
 # python3 -u ./server/fedbalancer.py --config_path ./config/vit_domainnet/dir_1_seed_166_client_30/fedbalancer.yaml
 

@@ -124,8 +124,9 @@ class FedAvgServer:
         self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "train")
         self.train_sampler = CustomSampler(list(range(len(self.trainset))))
         self.trainloader = DataLoader(Subset(self.trainset, list(range(len(self.trainset)))), self.args["batch_size"],
-                                      pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device=self.device,prefetch_factor = 16)
+                                      pin_memory=True, num_workers=2,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
+                                      sampler=self.train_sampler, pin_memory_device=self.device,prefetch_factor = 4)
+        self.accuracy = 0
 
 
         # TODO------------------------优化器和学习率调整器----------------------------------
@@ -151,12 +152,12 @@ class FedAvgServer:
             self.logger.log(f"current selected clients: {self.current_selected_client_ids}")
             training_time = self.train_one_round( E + 1 )
             self.current_time += training_time
-            accuracy,loss = evaluate(torch.device(self.device), self.model, self.testloader)
+            self.accuracy,loss = evaluate(torch.device(self.device), self.model, self.testloader)
             self.logger.log(f"Finished training!!! Current global epoch training time: {training_time}.",
                             f"The global time is {self.current_time}",
-                            f"The Global model accuracy is {accuracy:.3f}%.")
+                            f"The Global model accuracy is {self.accuracy:.3f}%.")
             if self.args["wandb"]:
-                self.experiment.log({"acc": accuracy}, step=self.current_time)
+                self.experiment.log({"acc": self.accuracy}, step=self.current_time)
         for client_instance in self.client_instances:
             self.logger.log(f"Client{client_instance.client_id}'s training time : {client_instance.training_time_record}")
 

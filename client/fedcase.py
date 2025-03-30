@@ -100,7 +100,7 @@ class FedCaSeTrainer(FedAvgTrainer):
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, targets)
-                loss = self.trainloader.dataset.update(loss)
+                loss = self.trainloader.dataset.update(loss,loss,self.device)
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()

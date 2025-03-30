@@ -79,15 +79,15 @@ class NeedIndexDataset(Dataset):
         return sum(_),np.min(_),_[np.abs(_ - np.percentile(_,80)).argmin()]
 
 
-    def update(self , values , loss_ = True):
-        batch_size = values.shape[0]
-        assert len(self.cur_batch_index) == batch_size and isinstance(values, torch.Tensor)
-        weight = self.weight[self.cur_batch_index].to("cuda:0")
+    def update(self ,loss , values , device,loss_ = True):
+        batch_size = loss.shape[0]
+        assert len(self.cur_batch_index) == batch_size and isinstance(loss, torch.Tensor)
+        weight = self.weight[self.cur_batch_index].to(device)
         value_val = values.detach().clone()
         self.value[self.cur_batch_index] = value_val.cpu()
         if loss_:
-            values.mul_(weight)
-            return values.mean()
+            loss.mul_(weight)
+            return loss.mean()
     
     def __len__(self):
         return len(self.dataset)
@@ -111,9 +111,6 @@ class NeedIndexSampler(Sampler):
         self.sample_indices = sample_indices # 存储当前样本的索引，值为索引
         self.iter_obj = None # 用于迭代样本索引的迭代器
         self.reset()  # 在初始化时重置采样器的状态
-    
-    def __getitem__(self, idx):
-        return self.sample_indices[idx]
 
     def reset(self):
         np.random.shuffle(self.sample_indices) # 将索引打散，返回一个全新的数组

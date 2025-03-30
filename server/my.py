@@ -10,7 +10,7 @@ import os
 from utls.dataset import NeedIndexDataset
 from torch.utils.data import DataLoader
 from data.utils.datasets import DATASETS_COLLATE_FN
-
+from utls.dataset import NeedIndexDataset
 
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1' # debug
 
@@ -31,7 +31,7 @@ class myFedServer(FedAvgServer):
         client_model_cache = []  # 缓存梯度
         weight_cache = []  # 缓存梯度对应的权重
         client_training_time = []
-        trainer_synchronization = {"round":global_round,'prune': False}
+        trainer_synchronization = {"round":global_round,'prune': False,"accuracy":self.accuracy / 100.}
         if self.current_global_epoch >= self.need_to_keep:
             trainer_synchronization['prune'] = True
         for client_id in self.current_selected_client_ids:

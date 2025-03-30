@@ -142,7 +142,7 @@ class ODETrainer(FedAvgTrainer):
                 self.optimizer.zero_grad()
                 for local_grad,global_grad in zip(_grad,global_gradient):
                     result += torch.sum(local_grad * global_grad)#local_grad要比global高一维
-            self.trainloader.dataset.update(result)
+            self.trainloader.dataset.update(result,result,self.device)
         del trainable_parameters
         value:np.array = self.trainloader.dataset.get_value(self.current_client.train_set_index)
         self.current_client.buffer_idx = []

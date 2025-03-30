@@ -1,4 +1,4 @@
-algorithm: classify_dynamic_batch
+algorithm: random_select
 model: resnet34 # resnet18、
 dataset: cinic10 #cinic10、
 
@@ -24,11 +24,11 @@ save_log: 1 # Non-zero value for saving algorithm running log
 # wandb记录
 wandb: 1
 project: "resnet34_cinic10_16_dir_3"
-experiment_name: "classify_dynamic_batch_r4_s0"
+experiment_name: "random_select_r3_s0"
 
 
 # 我的方法超参数
-r: 0.4
+r: 0.3
 start: 0.0
 max_gpu_memory_GB: 22
-device: "cuda:1"
+device: "cuda:0"

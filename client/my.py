@@ -7,8 +7,8 @@ from fedavg import FedAvgTrainer
 import numpy as np
 from data.utils.datasets import DATASETS_SIZE
 nvml.nvmlInit()
-
-
+import random
+import math
 
 class myFed(FedAvgTrainer):
     def __init__(self,
@@ -43,6 +43,8 @@ class myFed(FedAvgTrainer):
             "classify_dynamic_batch": self.classify_dynamic_batch,
             "classify_dynamic_batch_wo_weights": self.classify_dynamic_batch_wo_weights,
             "loss_dynamic_batch_global_loss_wo_weights": self.loss_dynamic_batch_global_loss_wo_weights,
+            "woparallel":self.woparallel,
+            "random_select": self.random_select
         }
 
         nvml.nvmlInit()
@@ -590,8 +592,64 @@ class myFed(FedAvgTrainer):
         train_thread.join()
         self.current_client.loss = global_loss_threshold.item()
 
+    def woparallel(self):
+        for _ in range(self.local_epoch):
+            for inputs, targets in self.trainloader:
+                if isinstance(inputs,torch.Tensor):
+                    inputs = inputs.to(self.device, non_blocking=True)
+                else:
+                    inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
+                targets = targets.to(self.device,non_blocking=True)
+                self.model.eval()
+                with torch.no_grad():
+                    # with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
+                        outputs = self.model(inputs)
+                        _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
+                        well_classified = targets == predicted
+                        mis_classified = ~well_classified
+                        num_well_classified = well_classified.sum()
+                        num_mis_classified = mis_classified.sum()
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
+                        weights = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
+                                    torch.full((num_select_well,), 1 / self.r, device=self.device)))
+                        inputs = torch.cat((inputs[mis_classified], inputs[well_classified][:num_select_well]),dim=0)
+                        targets = torch.cat((targets[mis_classified], targets[well_classified][:num_select_well]), dim=0)
+                self.model.train()
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets)
+                loss = (loss * weights).mean()
+                loss.backward()
+                self.optimizer.step()
+        torch.cuda.synchronize()
+
+    def random_select(self):
+        self.model.train()
+        for _ in range(self.local_epoch):
+            for inputs, targets in self.trainloader:
+                upper = math.ceil(len(targets) - (1-self.r) * len(targets) * self.synchronization['accuracy'])
+                lower = math.ceil(len(targets) * self.r)
+                if isinstance(inputs,torch.Tensor):
+                    inputs = inputs.to(self.device, non_blocking=True)
+                else:
+                    inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
+                targets = targets.to(self.device,non_blocking=True)
+                random_num = random.choice(range(lower, upper + 1))  # +1 确保包含 upper
+                index = random.sample(range(len(targets)), random_num)
+                inputs = inputs[index].contiguous()
+                targets = targets[index].contiguous()
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets).mean()
+                loss.backward()
+                self.optimizer.step()
+        torch.cuda.synchronize()
+
+
     def local_train(self):
-        if self.synchronization['prune'] and self.current_client.participation_times > 0:
+        if self.args["algorithm"] == "woparallel" or self.args["algorithm"] == "random_select":
+            self.func[self.args["algorithm"]]()
+        elif self.synchronization['prune'] and self.current_client.participation_times > 0:
             self.func[self.args["algorithm"]]()
             self.current_client.batch_size = self.trainloader.batch_sampler.batch_size  # 记录当前client的batch——size
         else:

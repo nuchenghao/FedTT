@@ -1,4 +1,4 @@
-algorithm: classify_dynamic_batch
+algorithm: fedprox_my
 model: resnet34 # resnet18、
 dataset: cinic10 #cinic10、
 
@@ -19,16 +19,12 @@ momentum: 0.0 # Momentum for client local opitimizer.
 weight_decay: 0.0 # Weight decay for client local optimizer.
 
 # record
-save_log: 1 # Non-zero value for saving algorithm running log
+save_log: 1 # Non-zero value for saving algorithm running log 
 
 # wandb记录
 wandb: 1
 project: "resnet34_cinic10_16_dir_3"
-experiment_name: "classify_dynamic_batch_r4_s0"
-
-
-# 我的方法超参数
-r: 0.4
-start: 0.0
-max_gpu_memory_GB: 22
+experiment_name: "fedprox_my"
 device: "cuda:1"
+mu: 0.1
+r: 0.3
