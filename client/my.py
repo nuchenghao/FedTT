@@ -332,6 +332,7 @@ class myFed(FedAvgTrainer):
             self.inference_to_train.put(len(itertrainloader))  # 训练线程预加载,这里的值时batch_size会load的次数
             inputs_raw, targets_raw = next(itertrainloader)
             with torch.cuda.stream(self.inference_stream):
+                self.train_event.wait()
                 if isinstance(inputs_raw,torch.Tensor):
                     self.inputs_b[cnt][:len(targets_raw), ...] = inputs_raw.to(self.device, non_blocking=True)
                     self.inputs[cnt] = self.inputs_b[cnt][:len(targets_raw)]
@@ -340,7 +341,6 @@ class myFed(FedAvgTrainer):
                     self.inputs_b[cnt] = self.inputs[cnt]
                 self.targets_b[cnt][:len(targets_raw), ...] = targets_raw.to(self.device,non_blocking=True)
                 self.targets[cnt] = self.targets_b[cnt][:len(targets_raw), ...]
-                self.train_event.wait()
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
@@ -369,6 +369,7 @@ class myFed(FedAvgTrainer):
                 cnt ^= 1
 
                 for inputs_raw, targets_raw in itertrainloader:
+                    self.train_event.wait()
                     if isinstance(inputs_raw,torch.Tensor):
                         self.inputs_b[cnt][:len(targets_raw), ...] = inputs_raw.to(self.device, non_blocking=True)
                         self.inputs[cnt] = self.inputs_b[cnt][:len(targets_raw), ...]
@@ -377,7 +378,7 @@ class myFed(FedAvgTrainer):
                         self.inputs_b[cnt] = self.inputs[cnt]
                     self.targets_b[cnt][:len(targets_raw), ...] = targets_raw.to(self.device,non_blocking=True)
                     self.targets[cnt] = self.targets_b[cnt][:len(targets_raw), ...]
-                    self.train_event.wait()
+                    
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
                     with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):

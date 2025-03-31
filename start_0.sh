@@ -41,7 +41,7 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet34_cinic10/dir_3
 
 
 
-# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0.yaml
+python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s05.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s15.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s2.yaml
@@ -93,12 +93,12 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet34_cinic10/dir_3
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_160.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_192.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_192.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_224.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_224.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_256.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_256.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_512.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_512.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_224.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_224.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_256.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_256.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_512.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_512.yaml
 
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/random_select.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/random_select400.yaml
