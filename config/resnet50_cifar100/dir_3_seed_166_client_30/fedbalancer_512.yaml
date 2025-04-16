@@ -1,4 +1,4 @@
-algorithm: fedavg
+algorithm: fedbalancer
 model: resnet50 # resnet18、
 dataset: cifar100 #cinic10、
 
@@ -10,7 +10,7 @@ client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
 global_epoch: 300
 local_epoch: 4
-batch_size: 48 # Data batch size for client local training.
+batch_size: 512 # Data batch size for client local training.
 t_batch_size: 2048
 client_eval: False
 
@@ -24,5 +24,5 @@ save_log: 1 # Non-zero value for saving algorithm running log
 # wandb记录
 wandb: 1
 project: "resnet50_cifar100_166_dir_3"
-experiment_name: "fedavg_H"
+experiment_name: "fedbalancer_512"
 device: "cuda:0"

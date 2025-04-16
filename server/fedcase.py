@@ -42,14 +42,13 @@ class FedCaseDataset(NeedIndexDataset):
         self.frequency = torch.zeros(len(self.dataset),dtype=torch.int32)
         self.experience = torch.zeros(len(self.dataset),dtype=torch.float32)
     
-    def update(self,values):
-        assert isinstance(values, torch.Tensor)
-        batch_size = values.shape[0]
-        assert len(self.cur_batch_index) == batch_size, 'not enough index'
+    def update(self,loss , values , device,loss_ = True):
+        batch_size = loss.shape[0]
+        assert len(self.cur_batch_index) == batch_size and isinstance(loss, torch.Tensor)
         value_val = values.detach().clone()
         self.value[self.cur_batch_index.long()] = value_val.cpu()
         self.frequency[self.cur_batch_index.long()] += 1 # 频率添加一次
-        return values.mean()
+        return loss.mean()
     
     def get_value(self,index : np.array):
         M_u_ = torch.max(self.value[index]) - torch.min(self.value[index])

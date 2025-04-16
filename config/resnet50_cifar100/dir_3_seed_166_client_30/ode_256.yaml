@@ -1,4 +1,4 @@
-algorithm: classify_dynamic_batch
+algorithm: ODE
 model: resnet50 # resnet18、
 dataset: cifar100 #cinic10、
 
@@ -10,25 +10,23 @@ client_num: 30 #客户端数量
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
 global_epoch: 300
 local_epoch: 4
-batch_size: 96 # Data batch size for client local training.
+batch_size: 256 # Data batch size for client local training.
 t_batch_size: 2048
 client_eval: False
+
 
 lr: 0.01 # Learning rate for client local training.
 momentum: 0.0 # Momentum for client local opitimizer.
 weight_decay: 0.0 # Weight decay for client local optimizer.
 
 # record
-save_log: 1 # Non-zero value for saving algorithm running log
+save_log: 1 # Non-zero value for saving algorithm running log 
 
 # wandb记录
 wandb: 1
 project: "resnet50_cifar100_166_dir_3"
-experiment_name: "classify_dynamic_batch_r3_s0_96"
+experiment_name: "ODE_256"
 
-
-# 我的方法超参数
-r: 0.3
-start: 0.0
-max_gpu_memory_GB: 22
-device: "cuda:0"
+labels_per_client: 1.0
+update_batch_size: 48
+device: "cuda:1"

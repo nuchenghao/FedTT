@@ -72,6 +72,31 @@ class CINIC10(datasets.ImageFolder):
     ):
         super().__init__(root=f"{root}/{which}", transform=DATA_TRANSFORMS['cinic10'][which])
 
+    #     # 预加载所有数据到内存
+    #     self.dataset = []
+    #     self.targets = []
+    #     for idx in range(len(self.samples)):
+    #         path, target = self.samples[idx]
+    #         # 加载图像并应用转换
+    #         sample = self.loader(path)
+    #         if self.transform is not None:
+    #             sample = self.transform(sample)
+    #         # 将数据和标签存储到内存
+    #         self.dataset.append(sample)
+    #         self.targets.append(target)
+        
+    #     # 将列表转换为张量（如果需要）
+    #     self.dataset = torch.stack(self.dataset)
+    #     self.targets = torch.tensor(self.targets)
+
+    # def __getitem__(self, index):
+    #     # 直接从内存中获取数据
+    #     img, target = self.dataset[index], self.targets[index]
+    #     return img, target
+
+    # def __len__(self):
+    #     return len(self.dataset)
+
 
 class CIFAR100(torchvision.datasets.CIFAR100):
     def __init__(self, root, which):

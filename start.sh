@@ -87,12 +87,12 @@ python3 -u ./data/generate_data.py --config_path ./config/resnet34_cinic10/dir_3
 
 
 
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_128.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_128.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_160.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_160.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_192.yaml
-python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_192.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_128.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_128.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_160.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_160.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_192.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_192.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_224.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_224.yaml
 # python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/woparallel_256.yaml
@@ -118,6 +118,48 @@ python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_
 # python3 -u ./server/fednova.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fednova_my.yaml
 
 
+
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_SD_r3_s0.yaml
+
+
+
+
+
+
+# python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_128.yaml
+# python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_256.yaml
+# python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_512.yaml
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_128.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_256.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/classify_dynamic_batch_r3_s0_512.yaml
+
+# python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_128.yaml
+# python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_256.yaml
+# python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_512.yaml
+
+
+python3 -u ./server/fedbalancer.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedbalancer_128.yaml
+python3 -u ./server/fedbalancer.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedbalancer_256.yaml
+python3 -u ./server/fedbalancer.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedbalancer_512.yaml
+
+
+# python3 -u ./server/fedsampling.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedsampling_128.yaml
+# python3 -u ./server/fedsampling.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedsampling_256.yaml
+# python3 -u ./server/fedsampling.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedsampling_512.yaml
+
+
+
+
+
+
+
+# python3 -u ./server/ODE.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/ode_128.yaml
+# python3 -u ./server/ODE.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/ode_256.yaml
+# python3 -u ./server/ODE.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/ode_512.yaml
 
 
 # # ------------------ seed 166 ---------------------------
@@ -538,6 +580,50 @@ python3 -u ./server/my.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_
 
 
 # python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/random_select.yaml
+
+
+
+
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_SD_r3_s0.yaml
+
+
+
+
+
+
+
+# python3 -u ./server/fedavg.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedavg_512.yaml
+# python3 -u ./server/fedavg.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedavg_96.yaml
+# python3 -u ./server/fedavg.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedavg_256.yaml
+
+
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r3_s0_96.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r3_s0_256.yaml
+# python3 -u ./server/my.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/classify_dynamic_batch_r3_s0_512.yaml
+
+
+
+# python3 -u ./server/fedbalancer.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedbalancer_96.yaml
+# python3 -u ./server/fedbalancer.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedbalancer_256.yaml
+# python3 -u ./server/fedbalancer.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedbalancer_512.yaml
+
+
+# python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedsampling_96.yaml
+# python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedsampling_256.yaml
+# python3 -u ./server/fedsampling.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedsampling_512.yaml
+
+
+# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedcase_96.yaml
+# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedcase_256.yaml
+# python3 -u ./server/fedcase.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/fedcase_512.yaml
+
+
+
+# python3 -u ./server/ODE.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/ode_96.yaml
+# python3 -u ./server/ODE.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/ode_256.yaml
+# python3 -u ./server/ODE.py --config_path ./config/resnet50_cifar100/dir_3_seed_166_client_30/ode_512.yaml
 
 
 

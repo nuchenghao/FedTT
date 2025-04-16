@@ -23,7 +23,7 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "woparallel"
+project: "resnet34_cinic10_16_dir_3"
 experiment_name: "classify_dynamic_batch_r3_s0_512"
 
 
@@ -31,4 +31,4 @@ experiment_name: "classify_dynamic_batch_r3_s0_512"
 r: 0.3
 start: 0.0
 max_gpu_memory_GB: 22
-device: "cuda:1"
+device: "cuda:0"
