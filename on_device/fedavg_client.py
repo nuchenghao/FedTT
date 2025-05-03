@@ -38,11 +38,11 @@ from utls.dataset import CustomSampler
 from utls.utils import Timer
 
 
-console = Console()  # 终端输出对象
-client_lock = threading.RLock()  # 多线程的client访问锁
+console = Console()  # 
+client_lock = threading.RLock()  # 
 read_finish = threading.Event()
 write_finish = threading.Event()
-print_lock = multiprocessing.RLock()  # 多进程的输出锁
+print_lock = multiprocessing.RLock()  # 
 
 
 
@@ -59,8 +59,8 @@ class BaseClient:
         self.pretrained_accuracy = 0
         self.accuracy = 0
         self.loss = 0.0
-        self.grad = None #存梯度值
-        self.buffer = None # 存persistent_buffers
+        self.grad = None #
+        self.buffer = None # 
 
         self.training_time_record = {}
 
@@ -78,7 +78,7 @@ class Trainer:
         self.args = args
         self.device ="cuda"
         self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
-        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes) # 暂时放置在CPU上
+        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes) # 
         self.current_client_instance = None
 
         self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / self.args["dataset"], "train")
@@ -88,35 +88,35 @@ class Trainer:
         self.local_epoch = self.args["local_epoch"]
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
         self.optimizer = None
-        self.timer = Timer()  # 训练计时器
+        self.timer = Timer()  # 
     
 
     def load_dataset(self):
-        self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)  # 在里面实现了深拷贝
+        self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)  # 
         self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
     
     def set_parameters(self,model_parameters):
         self.model.load_state_dict(model_parameters)
-        self.model = self.model.to(self.device) # 转移到gpu上
+        self.model = self.model.to(self.device) # 
         self.optimizer = torch.optim.SGD(params=self.model.parameters(),lr=self.args["lr"],momentum=self.args["momentum"],weight_decay=self.args["weight_decay"],)
 
     def start(self,global_epoch, client_instance, model_parameters):
         self.timer.start()
         self.current_client_instance = client_instance
-        self.set_parameters(model_parameters)  # 设置参数
+        self.set_parameters(model_parameters)  # 
         self.load_dataset()
 
-        self.local_train() # 本地训练
-        self.model = self.model.to("cpu") # 训练完成后放置到CPU上
+        self.local_train() # 
+        self.model = self.model.to("cpu") # 
 
-        # 拷贝模型参数
-        current_client_instance_model_dict = {key: copy.deepcopy(value) for key, value in self.model.state_dict().items()}  # 一定要深拷贝
+        # 
+        current_client_instance_model_dict = {key: copy.deepcopy(value) for key, value in self.model.state_dict().items()}  # 
         self.timer.stop()
 
         self.current_client_instance.training_time_record[global_epoch] = self.timer.times[-1]
         self.current_client_instance.participate_once()
 
-        # 返回训练后的模型参数，训练时间
+        # 
         return current_client_instance_model_dict, self.current_client_instance.training_time_record[global_epoch]
 
     def full_set(self):
@@ -130,16 +130,13 @@ class Trainer:
                 targets = targets.to(self.device,non_blocking=True)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets).mean() # 两者会有稍许误差
+                loss = self.criterion(outputs, targets).mean() # 
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
     
     def local_train(self):
-        """
-        本地训练函数，后面实现的算法要重写这个函数.
-        可以确定的是：在训练前，模型已经在设备上了
-        """
+
         self.full_set()
 
 
@@ -187,7 +184,7 @@ class ReadThread(threading.Thread):
             if data:
                 self._recv_buffer += data
             else:
-                raise RuntimeError("Peer closed.") # 当对端正常关闭连接（发送FIN包）后，本端调用recv()会返回空字节，表示对端已关闭连接。
+                raise RuntimeError("Peer closed.") # 
 
     def process_jsonheader(self):
         hdrlen = self._jsonheader_len
@@ -205,7 +202,7 @@ class ReadThread(threading.Thread):
 
     def process_response(self):
         content_len = self.jsonheader["content-length"]
-        if not len(self._recv_buffer) == content_len:  # 还没收到完整数据
+        if not len(self._recv_buffer) == content_len:  # 
             return
         raw_data = self._recv_buffer[:content_len]
         self.server_2_client_data = decode(raw_data)
@@ -232,14 +229,14 @@ class ReadThread(threading.Thread):
                     break
 
 
-class MyThread(threading.Thread):  # 每个线程与一个进程对应
+class MyThread(threading.Thread):  # 
     def __init__(self,):
         super().__init__()
         global client , client_lock, print_lock
         self.client = client
         self.client_lock = client_lock
         self.print_lock = print_lock
-        self.daemon = True  # 设置为守护进程
+        self.daemon = True  # 
 
     def run(self):
         while True:
@@ -261,9 +258,9 @@ class WriteProcess(multiprocessing.Process):
         self.need_to_send = need_to_send
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
-        self.sock.connect_ex(server_ip_port) # 创建一个连接
+        self.sock.connect_ex(server_ip_port) # 
         self.print_lock = print_lock
-        self._send_buffer = b""  # 写缓冲区
+        self._send_buffer = b""  # 
 
     def _create_message(
             self, content
@@ -285,7 +282,7 @@ class WriteProcess(multiprocessing.Process):
         with self.print_lock:
             console.log(f"start sending to server")
         response = self._create_response()
-        message = self._create_message(response)  # 加两个头文件
+        message = self._create_message(response)  # 
         self._send_buffer += message
         while True:
             if self._send_buffer:
@@ -317,7 +314,7 @@ class clientsocket:
         self.server_port = server_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
-        self.sock.connect_ex((self.server_ip,self.server_port)) # 创建一个连接
+        self.sock.connect_ex((self.server_ip,self.server_port)) # 
         self.need_to_send = {"name": name,"action":"register"}
     
     def _create_message(
@@ -339,7 +336,7 @@ class clientsocket:
     def send(self):
         console.log(f"start registering to server")
         response = self._create_response()
-        message = self._create_message(response)  # 加两个头文件
+        message = self._create_message(response)  # 
         _send_buffer = b""
         _send_buffer += message
         while True:
@@ -370,24 +367,24 @@ class Client:
         self.args = args
         self.socket_manager = socket_manager
         self.server_ip_port = (self.socket_manager.server_ip , self.socket_manager.server_port)
-        self.name = name  # 设备名称
+        self.name = name  # 
         self.received_data = None
 
-        self.need_to_send_queue = queue.Queue() # 给写守护进程的发送队列
-        self.need_to_send_num = 0 # 标志是否都发送完成，不可由need_to_send_queue.qsize()代替。因为qsize()==0时，可能还在发送
+        self.need_to_send_queue = queue.Queue() # 
+        self.need_to_send_num = 0 # 
 
-        self.client_ids = [] # 存储本地要训练的client的id号
-        self.clientId_dataIndex = {} # client的id号和其训练数据的索引
+        self.client_ids = [] # 
+        self.clientId_dataIndex = {} # 
 
-        self.client_instances_dict = {} # client的id号和其对应的client实例
+        self.client_instances_dict = {} # 
 
-        self.trainer = Trainer(self.args) # 训练器
+        self.trainer = Trainer(self.args) # 
 
-        self.current_epoch_transmission = 0 # 当前轮次的server发送给client的传输时间
+        self.current_epoch_transmission = 0 # 
 
-        self.current_selected_client_ids = [] # 当前全局训练轮次中被选中的client
+        self.current_selected_client_ids = [] # 
 
-        self.model = None # 记录本轮次中从server接收的全局模型参数
+        self.model = None # 
 
 def read_from_server():
     read_thread = ReadThread()
@@ -405,7 +402,7 @@ def run():
     client.clientId_dataIndex = client.received_data["data_indices"]
 
     console.log(f"device {client.name} need to train {client.client_ids}" , style='red')
-    # 实例化本地的client
+    # 
     for client_id in client.client_ids:
         client.client_instances_dict[client_id] = BaseClient(client_id, client.clientId_dataIndex[client_id], client.args["batch_size"])
     
@@ -422,12 +419,12 @@ def run():
     # while True:
     #     with client_lock:
     #         if client.need_to_send_num == 0:
-    #             break # 全部发送完成，一轮全局结束
+    #             break # 
     #     time.sleep(1) 
     
-    # =========== 开始训练 =======================
+    # ===========  =======================
     while True:
-        # ======== 接收 ==============
+        # ========  ==============
         read_from_server() 
 
 
@@ -446,13 +443,13 @@ def run():
             current_client_instance_model_dict, training_time = client.trainer.start(client.received_data['global_epoch'],client.client_instances_dict[client_id],client.model)
             
             client_2_server_data = dict(
-                                        name=client.name, # 设备名称
-                                        action="upload", # 行为
-                                        client_id=client_id,  # 训练的client id号
-                                        client_model = current_client_instance_model_dict, # 模型参数
-                                        weight = client.client_instances_dict[client_id].train_set_len, # 权重
-                                        s2c_training_time = training_time + client.current_epoch_transmission, # 下发与训练的时间
-                                        **client.client_instances_dict[client_id].neet_to_send())  # 客户需要发送的信息
+                                        name=client.name, # 
+                                        action="upload", # 
+                                        client_id=client_id,  #  
+                                        client_model = current_client_instance_model_dict, # 
+                                        weight = client.client_instances_dict[client_id].train_set_len, # 
+                                        s2c_training_time = training_time + client.current_epoch_transmission, # 
+                                        **client.client_instances_dict[client_id].neet_to_send())  # 
             console.log(f"{client_id} has finished training, using {training_time}s")
             with client_lock:
                 client.need_to_send_num += 1
@@ -466,7 +463,7 @@ def run():
         # while True:
         #     with client_lock:
         #         if client.need_to_send_num == 0:
-        #             break # 全部发送完成，一轮全局结束
+        #             break # 
         #     time.sleep(0.5) 
         # =============================
 

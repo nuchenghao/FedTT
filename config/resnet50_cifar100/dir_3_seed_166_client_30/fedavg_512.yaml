@@ -23,6 +23,6 @@ save_log: 1 # Non-zero value for saving algorithm running log
 
 # wandb记录
 wandb: 1
-project: "resnet50_cifar100_166_dir_3"
+project: "resnet50_cifar100_166_dir_3_4090"
 experiment_name: "fedavg_512"
 device: "cuda:0"

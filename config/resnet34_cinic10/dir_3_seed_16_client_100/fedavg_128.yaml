@@ -22,7 +22,7 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 save_log: 1 # Non-zero value for saving algorithm running log 
 
 # wandb记录
-wandb: 1
+wandb: 0
 project: "resnet34_cinic10_16_dir_3"
 experiment_name: "fedavg_128"
 device: "cuda:0"

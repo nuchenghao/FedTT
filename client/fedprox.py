@@ -41,13 +41,13 @@ class FedProxTrainer(FedAvgTrainer):
         self.barrier = threading.Barrier(2)
         self.finish_one_epoch = threading.Event()
         self.r = self.args['r']
-        # 修改评判器
+        # 
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
 
 
     
     def set_parameters(self, optimizer_state_dict, trainer_synchronization):
-        self.optimizer.load_state_dict(optimizer_state_dict)  # 加载全局优化器
+        self.optimizer.load_state_dict(optimizer_state_dict)  # 
         self.model.load_state_dict(self.current_client.model_dict)
         self.synchronization = trainer_synchronization
         self.global_model = self.current_client.model_dict
@@ -63,7 +63,7 @@ class FedProxTrainer(FedAvgTrainer):
                 targets = targets.to(self.device,non_blocking=True)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets).mean() # 两者会有稍许误差
+                loss = self.criterion(outputs, targets).mean() # 
                 proximal_term = 0.0
                 for name, param in self.model.named_parameters():
                     proximal_term += (param - self.global_model[name]).norm(2)
@@ -105,10 +105,10 @@ class FedProxTrainer(FedAvgTrainer):
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
-            # torch.cuda.reset_peak_memory_stats() # 重置显存峰值统计
+            # torch.cuda.reset_peak_memory_stats() # 
             # gpu_utilization = []
-            itertrainloader = iter(self.trainloader)  # 创建trainloader的迭代器
-            self.inference_to_train.put(len(itertrainloader))  # 训练线程预加载,这里的值时batch_size会load的次数
+            itertrainloader = iter(self.trainloader)  # 
+            self.inference_to_train.put(len(itertrainloader))  # 
             inputs_raw, targets_raw = next(itertrainloader)
             with torch.cuda.stream(self.inference_stream):
                 if isinstance(inputs_raw,torch.Tensor):
@@ -125,12 +125,12 @@ class FedProxTrainer(FedAvgTrainer):
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
-                        _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
+                        _, predicted = outputs.max(1)  # 
                         well_classified = self.targets[cnt] == predicted
                         mis_classified = ~well_classified
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
                         self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r, device=self.device)))
                         if isinstance(inputs_raw,torch.Tensor):
@@ -162,12 +162,12 @@ class FedProxTrainer(FedAvgTrainer):
                     with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
-                            _, predicted = outputs.max(1)  # 返回这个batch中，值和索引
+                            _, predicted = outputs.max(1)  # 
                             well_classified = self.targets[cnt] == predicted
                             mis_classified = ~well_classified
                             num_well_classified = well_classified.sum()
                             num_mis_classified = mis_classified.sum()
-                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 这里要注意
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
                             # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
                             self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r, device=self.device)))

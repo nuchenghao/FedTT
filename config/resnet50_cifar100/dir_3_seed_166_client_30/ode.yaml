@@ -27,6 +27,6 @@ wandb: 1
 project: "resnet50_cifar100_166_dir_3"
 experiment_name: "ODE"
 
-labels_per_client: 1.0
+labels_per_client: 0.5
 update_batch_size: 48
 device: "cuda:0"

@@ -49,12 +49,12 @@ class FedCaSeTrainer(FedAvgTrainer):
         len_flash = self.current_client.R_S - len(rep_samples)
         flash_index = index_sorted_experience[-(self.current_client.num_cached+len_flash):-self.current_client.num_cached]
         self.current_client.selected_samples_index = self.current_client.train_set_index[torch.cat((rep_samples,flash_index),dim=0).numpy()]
-        self.current_client.train_set_len = len(self.current_client.selected_samples_index) # 更新，后续用于聚合时的参数
+        self.current_client.train_set_len = len(self.current_client.selected_samples_index) # 
 
     def load_dataset(self):
         if self.current_client.participation_times > 2:
             self.client_data_sampling()
-            self.trainloader.sampler.set_index(self.current_client.selected_samples_index)  # 在里面实现了深拷贝
+            self.trainloader.sampler.set_index(self.current_client.selected_samples_index)  # 
         else:
             self.trainloader.sampler.set_index(self.current_client.train_set_index)
         self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
@@ -66,7 +66,7 @@ class FedCaSeTrainer(FedAvgTrainer):
               ):
         self.timer.start()
         self.current_client = client
-        self.set_parameters(optimizer_state_dict, trainer_synchronization)  # 设置参数
+        self.set_parameters(optimizer_state_dict, trainer_synchronization)  # 
         self.load_dataset()
         
         if self.args['client_eval']:
@@ -74,18 +74,18 @@ class FedCaSeTrainer(FedAvgTrainer):
         else:
             self.current_client.pretrained_accuracy = 0.0
 
-        self.local_train() # 本地训练
+        self.local_train() # 
 
         if self.args['client_eval']:
             self.current_client.accuracy = evaluate(self.device, self.model, self.testloader)
         else:
             self.current_client.accuracy = 0.0
-        self.current_client.model_dict = deepcopy(self.model.state_dict())  # 一定要深拷贝
-        self.timer.stop() # 里面的一些操作带来的开销就权当是网络传输的时间了
+        self.current_client.model_dict = deepcopy(self.model.state_dict())  # 
+        self.timer.stop() # 
         self.current_client.training_time = self.timer.times[-1]
         self.current_client.participate_once()
-        self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0) # 记录时间
-        torch.cuda.empty_cache() # 释放缓存 
+        self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0) # 
+        torch.cuda.empty_cache() # 
         return self.current_client
     
     def full_set(self):
