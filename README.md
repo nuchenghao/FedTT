@@ -1,1 +1,1 @@
-# myFed
+Code for *It Takes Two: Accelerating Accurate Federated Learning through Pipelined Intra-Batch Data Sampling and Training*

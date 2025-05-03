@@ -21,7 +21,6 @@ from utls.utils import (
 from utls.utils import Timer
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
-
 if __name__=='__main__':
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:
@@ -32,14 +31,12 @@ if __name__=='__main__':
         log_dir = f"{PROJECT_DIR}/WANDB_LOG_DIR"
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
-
         experiment = wandb.init(
             project=f"{args['project']}",
             config=args,
             dir=log_dir,
             reinit=True,
         )
-        # the name of the experiment run for Weights & Biases (W&B)
         experiment.name = args["experiment_name"]
         experiment.log({"acc": 0.0}, step=0)
         wandb.run.save()
@@ -59,12 +56,10 @@ if __name__=='__main__':
     optimizer = torch.optim.SGD(model.parameters(), lr=args["lr"],
                                          momentum=args["momentum"], weight_decay=args["weight_decay"])
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to('cuda:0')
-
     def test(epoch):
         model.eval()
         correct = 0
         total = 0
-
         with torch.no_grad():
             for batch_idx, (inputs, targets) in enumerate(testloader):
                 if isinstance(inputs,torch.Tensor):
@@ -79,7 +74,6 @@ if __name__=='__main__':
         cur_acc = round(100. * correct / total, 3)
         print(f"epoch {epoch} : test acc is {cur_acc}")
         return cur_acc
-
     timer=Timer()
     for epoch in tqdm(range(args['global_epoch'])):
         model.train()

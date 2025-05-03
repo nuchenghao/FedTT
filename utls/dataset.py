@@ -6,15 +6,12 @@ from torch.utils.data.dataloader import _BaseDataLoaderIter
 import copy
 import numpy as np
 import warnings
-
-
 class CustomSampler(Sampler):
     def __init__(self, indices):
         super(CustomSampler, self).__init__()
         assert isinstance(indices, torch.Tensor) == False , "the type of indices cannot be torch.Tensor"
         random.shuffle(indices)
         self.indices = indices
-
     def set_index(self, indices, epoch=1):
         assert isinstance(indices, torch.Tensor) == False , "the type of indices cannot be torch.Tensor"
         train_index = []
@@ -23,17 +20,12 @@ class CustomSampler(Sampler):
             random.shuffle(copyed_indices)
             train_index.extend(copyed_indices)
         self.indices = train_index
-
     def __iter__(self):
-        # 返回索引的迭代器；这里每次需要先shuffle一次；注意：random.shuffle只能作用在list和np.array中；不能作用在torch.tensor中，会出错
         assert isinstance(self.indices, torch.Tensor) == False , "the type of indices cannot be torch.Tensor"
         random.shuffle(self.indices)
         return iter(self.indices)
-
     def __len__(self):
-        # 返回索引的数量
         return len(self.indices)
-
 def NeedIndex_hack_indices(self):
     with torch.autograd.profiler.record_function(self._profile_name):
         if self._sampler_iter is None:
@@ -52,33 +44,25 @@ def NeedIndex_hack_indices(self):
             if self._num_workers > 0:
                 warn_msg += ("For multiprocessing data-loading, this could be caused by not properly configuring the "
                              "IterableDataset replica at each worker. Please see "
-                             "https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset for examples.")
+                             "https://pytorch.org/docs/stable/data.html
             warnings.warn(warn_msg)
         if isinstance(self._dataset, NeedIndexDataset):
             self._dataset.set_current_indices(indices)
         return data
-
-
 class NeedIndexDataset(Dataset):
     def __init__(self , dataset):
         self.dataset = dataset    
         self.value = torch.zeros(len(self.dataset),dtype=torch.float32)
         self.weight = torch.ones(len(self.dataset),dtype=torch.float32)
         self.cur_batch_index = None
-        _BaseDataLoaderIter.__next__ = NeedIndex_hack_indices # 在类内重载dataloader的__next__方法
-    
-    
+        _BaseDataLoaderIter.__next__ = NeedIndex_hack_indices
     def set_current_indices(self, cur_batch_indices: torch.Tensor):
         self.cur_batch_index = cur_batch_indices
-    
     def get_value(self,index : np.array):
         return self.value[index].numpy()
-    
     def get_min_max_value(self,index:np.array):
         _ = self.value[index].numpy()
         return sum(_),np.min(_),_[np.abs(_ - np.percentile(_,80)).argmin()]
-
-
     def update(self ,loss , values , device,loss_ = True):
         batch_size = loss.shape[0]
         assert len(self.cur_batch_index) == batch_size and isinstance(loss, torch.Tensor)
@@ -88,45 +72,34 @@ class NeedIndexDataset(Dataset):
         if loss_:
             loss.mul_(weight)
             return loss.mean()
-    
     def __len__(self):
         return len(self.dataset)
-
     def __getitem__(self, index):
         return index, self.dataset[index]  
-
     @property
     def sampler(self):
         return NeedIndexSampler(self , np.arange(len(self.dataset))) 
-
     def reset_weight(self,index,value):
         self.weight[index] = value
-
-
 class NeedIndexSampler(Sampler):
     def __init__(self, dataset : NeedIndexDataset , sample_indices : np.array):
         super().__init__()
         self.dataset = dataset
         assert isinstance(sample_indices, torch.Tensor) == False , "the type of sample_indices cannot be torch.Tensor"
-        self.sample_indices = sample_indices # 存储当前样本的索引，值为索引
-        self.iter_obj = None # 用于迭代样本索引的迭代器
-        self.reset()  # 在初始化时重置采样器的状态
-
+        self.sample_indices = sample_indices
+        self.iter_obj = None
+        self.reset()
     def reset(self):
-        np.random.shuffle(self.sample_indices) # 将索引打散，返回一个全新的数组
-        self.iter_obj = iter(self.sample_indices)  # 将 sample_indices 转换为迭代器 iter_obj。
-
+        np.random.shuffle(self.sample_indices)
+        self.iter_obj = iter(self.sample_indices)
     def set_index(self , sample_indices):
         assert isinstance(sample_indices, torch.Tensor) == False , "the type of sample_indices cannot be torch.Tensor"
         self.sample_indices = copy.deepcopy(sample_indices)
         self.reset()
-
     def __next__(self):
         return next(self.iter_obj)
-    
     def __len__(self):
         return len(self.sample_indices)
-    
     def __iter__(self):
         self.reset()
         return self

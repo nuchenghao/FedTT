@@ -9,42 +9,30 @@ import numpy as np
 from collections import OrderedDict
 class Estimator:
     def __init__(self,M,alpha,dataset_len):
-        self.M = M # size threshold；
-        self.alpha = alpha # 
+        self.M = M
+        self.alpha = alpha
         self.real_response = dataset_len
-    
     def query(self):
-        fake_response = np.random.randint(1,self.M) #
-        choice = np.random.binomial(n=1,p=self.alpha)# 
-        # 
+        fake_response = np.random.randint(1,self.M)
+        choice = np.random.binomial(n=1,p=self.alpha)
         response = choice*self.real_response + (1-choice)*fake_response
         return response
-
-
 class fedsamplingClient(BaseClient):
     def __init__(self, client_id, train_index, batch_size):
         super().__init__(client_id, train_index, batch_size)
-        
     def set_estimator(self , M, alpha):
         self.estimator = Estimator(M,alpha,self.train_set_len)
-
-
-
-
 class fedsamplingTrainer(FedAvgTrainer):
     def __init__(self, device, model, trainloader, testloader, args):
         super().__init__(device, model, trainloader, testloader, args)  
         self.selected_data_num = 0
-    
     def load_dataset(self):
-        # 
         choosed = np.random.binomial(size=(self.current_client.train_set_len,), n=1, p=min(1.0,self.synchronization['KN']))
         candidate_set_index=np.array(self.current_client.train_set_index)
         participate_set_index = candidate_set_index[choosed == 1].tolist()
         self.current_client.selected_data_num=len(participate_set_index)
-        self.trainloader.sampler.set_index(participate_set_index)  # 
+        self.trainloader.sampler.set_index(participate_set_index)
         self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
-    
     def start(self,
               client,
               optimizer_state_dict,
@@ -52,16 +40,13 @@ class fedsamplingTrainer(FedAvgTrainer):
               ):
         self.timer.start()
         self.current_client = client
-        self.set_parameters(optimizer_state_dict, trainer_synchronization)  # 
+        self.set_parameters(optimizer_state_dict, trainer_synchronization)
         self.load_dataset()
-
         if self.args['client_eval']:
             self.current_client.pretrained_accuracy = evaluate(self.device, self.model, self.testloader)
         else:
             self.current_client.pretrained_accuracy = 0.0
-        
         self.local_train()
-
         if self.args['client_eval']:
             self.current_client.accuracy = evaluate(self.device, self.model, self.testloader)
         else:
@@ -72,11 +57,11 @@ class fedsamplingTrainer(FedAvgTrainer):
         buffer = OrderedDict()
         for name , param in self.model.named_buffers():
             buffer[name] = self.current_client.selected_data_num * deepcopy(param.data)
-        self.timer.stop() # 
+        self.timer.stop()
         self.current_client.training_time = self.timer.times[-1]
         self.current_client.participate_once()
-        self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0) # 
+        self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0)
         self.current_client.grad = delta
         self.current_client.buffer = buffer
-        torch.cuda.empty_cache() #  
+        torch.cuda.empty_cache()
         return self.current_client

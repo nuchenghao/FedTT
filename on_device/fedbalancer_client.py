@@ -31,57 +31,40 @@ from utls.utils import (
     get_argparser,
     evaluate
 )
-
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
 from utls.dataset import CustomSampler
 from utls.utils import Timer
 from utls.dataset import NeedIndexDataset
-
-
-console = Console()  # 终端输出对象
-client_lock = threading.RLock()  # 多线程的client访问锁
+console = Console()
+client_lock = threading.RLock()
 read_finish = threading.Event()
 write_finish = threading.Event()
-print_lock = multiprocessing.RLock()  # 多进程的输出锁
-
-
-
+print_lock = multiprocessing.RLock()
 class BaseClient:
     def __init__(self, client_id, train_index, batch_size):
         self.client_id = client_id
         self.train_set_index = np.array(train_index)
         self.train_set_len = len(train_index)
         self.participation_times = 0
-
         self.batch_size = batch_size
-
         self.training_time = 0
         self.pretrained_accuracy = 0
         self.accuracy = 0
         self.loss = 0.0
-        self.grad = None #存梯度值
-        self.buffer = None # 存persistent_buffers
-
+        self.grad = None
+        self.buffer = None
         self.training_time_record = {}
-
         self.p = 1
-
-        self.batch_training_time = 0.0 # 单位为s
+        self.batch_training_time = 0.0
         self.selected_data_index = None
         self.metadata = {}
-
         self.len_OT =self.train_set_len
-
         self.batch_training_time = 0.0
-
     def participate_once(self):
         self.participation_times += 1
-
     def neet_to_send(self):
         return {"metadata" : self.metadata, "info" : {"len_OT": self.len_OT, "batch_size" : self.batch_size, "batch_training_time" : self.batch_training_time}}
-
-
 class Trainer:
     def __init__(
             self,
@@ -90,9 +73,8 @@ class Trainer:
         self.args = args
         self.device ="cuda"
         self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
-        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes) # 暂时放置在CPU上
+        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes)
         self.current_client_instance = None
-
         self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / self.args["dataset"], "train")
         self.trainset = NeedIndexDataset(self.trainset)
         self.train_sampler = self.trainset.sampler
@@ -101,16 +83,14 @@ class Trainer:
         self.local_epoch = self.args["local_epoch"]
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
         self.optimizer = None
-        self.timer = Timer()  # 训练计时器
+        self.timer = Timer()
         self.synchronization = {}
         self.p = 1
-    
-
     def load_dataset(self,full):
         if not full:
             S = int(max(self.synchronization['deadline'] / self.local_epoch / self.current_client_instance.batch_training_time,1.0) * self.current_client_instance.batch_size)
             if self.current_client_instance.participation_times == 0 or S >= self.current_client_instance.train_set_len:
-                self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)  # 在里面实现了深拷贝
+                self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)
                 self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
                 self.current_client_instance.len_OT = self.current_client_instance.train_set_len
                 self.current_client_instance.selected_data_index = self.current_client_instance.train_set_index
@@ -124,48 +104,38 @@ class Trainer:
                 D_ = np.random.choice(over_threshold, size = min(int(L * self.p) , len(over_threshold)), replace=False) 
                 D__ = np.random.choice(under_threshold , size = min(max(0 , L - len(D_)),len(under_threshold)) , replace = False)
                 selected_index=np.concatenate((D_ , D__))
-                self.trainloader.sampler.set_index(selected_index)  # 在里面实现了深拷贝
+                self.trainloader.sampler.set_index(selected_index)
                 self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
                 self.current_client_instance.selected_data_index = selected_index
                 self.current_client_instance.len_OT = len(over_threshold)
         else:
-            self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)  # 在里面实现了深拷贝
+            self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)
             self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
-    
     def set_parameters(self,model_parameters, synchronization):
         self.model.load_state_dict(model_parameters)
-        self.model = self.model.to(self.device) # 转移到gpu上
+        self.model = self.model.to(self.device)
         self.optimizer = torch.optim.SGD(params=self.model.parameters(),lr=self.args["lr"],momentum=self.args["momentum"],weight_decay=self.args["weight_decay"],)
         self.synchronization = synchronization
-
     def get_batch_training_time(self, training_time):
         return training_time / (len(self.trainloader.sampler) * self.local_epoch / self.current_client_instance.batch_size) 
-
-
     def start(self, global_epoch, client_instance, model_parameters,synchronization):
         self.timer.start()
         self.current_client_instance = client_instance
-        self.set_parameters(model_parameters,synchronization)  # 设置参数
+        self.set_parameters(model_parameters,synchronization)
         self.load_dataset(global_epoch == 0)
-
-        self.local_train() # 本地训练
-        self.model = self.model.to("cpu") # 训练完成后放置到CPU上
-
-        # 拷贝模型参数
-        current_client_instance_model_dict = {key: copy.deepcopy(value) for key, value in self.model.state_dict().items()}  # 一定要深拷贝
+        self.local_train()
+        self.model = self.model.to("cpu")
+        current_client_instance_model_dict = {key: copy.deepcopy(value) for key, value in self.model.state_dict().items()}
         if global_epoch > 0:
             loss_sum , min_loss , max_loss_80 = self.trainloader.dataset.get_min_max_value(self.current_client_instance.selected_data_index)
             self.current_client_instance.metadata['lsum'] = loss_sum
             self.current_client_instance.metadata['llow'] = min_loss
             self.current_client_instance.metadata['lhigh'] = max_loss_80
         self.timer.stop()
-
         self.current_client_instance.training_time_record[global_epoch] = self.timer.times[-1]
         self.current_client_instance.participate_once()
         self.current_client_instance.batch_training_time = self.get_batch_training_time(self.current_client_instance.training_time_record[global_epoch])
-        # 返回训练后的模型参数，训练时间
         return current_client_instance_model_dict, self.current_client_instance.training_time_record[global_epoch]
-
     def full_set(self):
         self.model.train()
         for _ in range(self.local_epoch):
@@ -182,38 +152,20 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
-    
     def local_train(self):
-        """
-        本地训练函数，后面实现的算法要重写这个函数.
-        可以确定的是：在训练前，模型已经在设备上了
-        """
         self.full_set()
-
-
-
-
 def encode(obj):
     return pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
-
-
 def decode(pickle_bytes, encoding='utf-8'):
     obj = pickle.loads(pickle_bytes, encoding=encoding)
     return obj
-
-
 def json_encode(obj, encoding):
     return json.dumps(obj, ensure_ascii=False).encode(encoding)
-
-
 def json_decode(json_bytes, encoding):
     tiow = io.TextIOWrapper(io.BytesIO(json_bytes), encoding=encoding, newline="")
     obj = json.load(tiow)
     tiow.close()
     return obj
-
-
-
 class ReadThread(threading.Thread):
     def __init__(self):
         super().__init__()
@@ -225,18 +177,16 @@ class ReadThread(threading.Thread):
         self.jsonheader = None
         self.server_2_client_data = None
         self.finishedRead = False
-
     def _read(self):
         try:
-            data = self.client.socket_manager.sock.recv(20_971_520)  # 20MB
+            data = self.client.socket_manager.sock.recv(20_971_520)
         except BlockingIOError:
             pass
         else:
             if data:
                 self._recv_buffer += data
             else:
-                raise RuntimeError("Peer closed.") # 当对端正常关闭连接（发送FIN包）后，本端调用recv()会返回空字节，表示对端已关闭连接。
-
+                raise RuntimeError("Peer closed.")
     def process_jsonheader(self):
         hdrlen = self._jsonheader_len
         if len(self._recv_buffer) >= hdrlen:
@@ -244,27 +194,23 @@ class ReadThread(threading.Thread):
                 self._recv_buffer[:hdrlen], "utf-8"
             )
             self._recv_buffer = self._recv_buffer[hdrlen:]
-
     def process_protoheader(self):
         hdrlen = 2
         if len(self._recv_buffer) >= hdrlen:
             self._jsonheader_len = struct.unpack(">H", self._recv_buffer[:hdrlen])[0]
             self._recv_buffer = self._recv_buffer[hdrlen:]
-
     def process_response(self):
         content_len = self.jsonheader["content-length"]
-        if not len(self._recv_buffer) == content_len:  # 还没收到完整数据
+        if not len(self._recv_buffer) == content_len:
             return
         raw_data = self._recv_buffer[:content_len]
         self.server_2_client_data = decode(raw_data)
-
         server_2_client_time = time.time() - self.server_2_client_data['timestamp']
         self.server_2_client_data = self.server_2_client_data['content']
         self.server_2_client_data["server_2_client_time"] = server_2_client_time
         with self.client_lock:
             self.client.received_data = self.server_2_client_data
         self.finishedRead = True
-
     def run(self):
         while True:
             self._read()
@@ -278,17 +224,14 @@ class ReadThread(threading.Thread):
                     self.process_response()
                 else:
                     break
-
-
-class MyThread(threading.Thread):  # 每个线程与一个进程对应
+class MyThread(threading.Thread):
     def __init__(self,):
         super().__init__()
         global client , client_lock, print_lock
         self.client = client
         self.client_lock = client_lock
         self.print_lock = print_lock
-        self.daemon = True  # 设置为守护进程
-
+        self.daemon = True
     def run(self):
         while True:
             need_to_send = self.client.need_to_send_queue.get()
@@ -299,20 +242,15 @@ class MyThread(threading.Thread):  # 每个线程与一个进程对应
                 self.client.need_to_send_num -= 1
                 if self.client.need_to_send_num == 0:
                     write_finish.set()
-
-            
-
-
 class WriteProcess(multiprocessing.Process):
     def __init__(self, server_ip_port, need_to_send, print_lock):
         super().__init__()
         self.need_to_send = need_to_send
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
-        self.sock.connect_ex(server_ip_port) # 创建一个连接
+        self.sock.connect_ex(server_ip_port)
         self.print_lock = print_lock
-        self._send_buffer = b""  # 写缓冲区
-
+        self._send_buffer = b""
     def _create_message(
             self, content
     ):
@@ -323,17 +261,15 @@ class WriteProcess(multiprocessing.Process):
         message_hdr = struct.pack(">H", len(jsonheader_bytes))
         message = message_hdr + jsonheader_bytes + content
         return message
-
     def _create_response(self):
         response = dict(timestamp = time.time(), content = self.need_to_send)
         response = encode(response)
         return response
-
     def run(self):
         with self.print_lock:
             console.log(f"start sending to server")
         response = self._create_response()
-        message = self._create_message(response)  # 加两个头文件
+        message = self._create_message(response)
         self._send_buffer += message
         while True:
             if self._send_buffer:
@@ -347,7 +283,6 @@ class WriteProcess(multiprocessing.Process):
                 break
         with self.print_lock:
             console.log(f"send to server successfully")
-
         try:
             self.sock.close()
         except OSError as e:
@@ -355,19 +290,14 @@ class WriteProcess(multiprocessing.Process):
                 console.log(f"Error: socket.close() exception: {e!r}")
         finally:
             self.sock = None
-
-    
-
-
 class clientsocket:
     def __init__(self, server_ip, server_port, name):
         self.server_ip = server_ip
         self.server_port = server_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
-        self.sock.connect_ex((self.server_ip,self.server_port)) # 创建一个连接
+        self.sock.connect_ex((self.server_ip,self.server_port))
         self.need_to_send = {"name": name,"action":"register"}
-    
     def _create_message(
             self, content
     ):
@@ -378,16 +308,14 @@ class clientsocket:
         message_hdr = struct.pack(">H", len(jsonheader_bytes))
         message = message_hdr + jsonheader_bytes + content
         return message
-
     def _create_response(self):
         response = dict(timestamp = time.time(), content = self.need_to_send)
         response = encode(response)
         return response
-
     def send(self):
         console.log(f"start registering to server")
         response = self._create_response()
-        message = self._create_message(response)  # 加两个头文件
+        message = self._create_message(response)
         _send_buffer = b""
         _send_buffer += message
         while True:
@@ -401,7 +329,6 @@ class clientsocket:
             else:
                 break
         console.log(f"send to server successfully")
-
     def close(self):
         print(f"Closing connection to {self.server_ip}")
         try:
@@ -409,72 +336,44 @@ class clientsocket:
         except OSError as e:
             print(f"Error: socket.close() exception for {self.addr}: {e!r}")
         finally:
-            # Delete reference to socket object for garbage collection
             self.sock = None
-
-
 class Client:
     def __init__(self, args, socket_manager, name):
         self.args = args
         self.socket_manager = socket_manager
         self.server_ip_port = (self.socket_manager.server_ip , self.socket_manager.server_port)
-        self.name = name  # 设备名称
+        self.name = name
         self.received_data = None
-
-        self.need_to_send_queue = queue.Queue() # 给写守护进程的发送队列
-        self.need_to_send_num = 0 # 标志是否都发送完成，不可由need_to_send_queue.qsize()代替。因为qsize()==0时，可能还在发送
-
-        self.client_ids = [] # 存储本地要训练的client的id号
-        self.clientId_dataIndex = {} # client的id号和其训练数据的索引
-
-        self.client_instances_dict = {} # client的id号和其对应的client实例
-
-        self.trainer = Trainer(self.args) # 训练器
-
-        self.current_epoch_transmission = 0 # 当前轮次的server发送给client的传输时间
-
-        self.current_selected_client_ids = [] # 当前全局训练轮次中被选中的client
-
-        self.model = None # 记录本轮次中从server接收的全局模型参数
-
+        self.need_to_send_queue = queue.Queue()
+        self.need_to_send_num = 0
+        self.client_ids = []
+        self.clientId_dataIndex = {}
+        self.client_instances_dict = {}
+        self.trainer = Trainer(self.args)
+        self.current_epoch_transmission = 0
+        self.current_selected_client_ids = []
+        self.model = None
 def read_from_server():
     read_thread = ReadThread()
     read_thread.start()
     read_thread.join()
-
-
-
 def run():
     global client, client_lock
-    # ============== register================
     client.socket_manager.send()
     read_from_server()
     client.client_ids = client.received_data["clients"]
     client.clientId_dataIndex = client.received_data["data_indices"]
-
     console.log(f"device {client.name} need to train {client.client_ids}" , style='red')
-    # 实例化本地的client
     for client_id in client.client_ids:
         client.client_instances_dict[client_id] = BaseClient(client_id, client.clientId_dataIndex[client_id], client.args["batch_size"])
-    
     console.log("clients has been initialized successfully")
-
-
     client_2_server_data = dict(name=client.name,action= "check") 
     with client_lock:
         client.need_to_send_num += 1
         write_finish.clear() 
     client.need_to_send_queue.put(client_2_server_data)
     write_finish.wait()
-    write_finish.clear() 
-    # while True:
-    #     with client_lock:
-    #         if client.need_to_send_num == 0:
-    #             break # 全部发送完成，一轮全局结束
-    #     time.sleep(1) 
-    
-
-    # 测试：
+    write_finish.clear()
     read_from_server() 
     console.log("start testing")
     client.model = client.received_data['model']
@@ -487,40 +386,23 @@ def run():
     for client_id in client.current_selected_client_ids:
         assert client_id in client.client_ids , f"{client_id} do not belongs to the device" 
         current_client_instance_model_dict, training_time = client.trainer.start(client.received_data['global_epoch'],client.client_instances_dict[client_id],client.model, synchronization)
-        
         client_2_server_data = dict(
-                                    name=client.name, # 设备名称
-                                    action="test", # 行为
-                                    client_id=client_id,  # 训练的client id号
-                                    s2c_training_time = training_time + client.current_epoch_transmission, # 下发与训练的时间
+                                    name=client.name,
+                                    action="test",
+                                    client_id=client_id,
+                                    s2c_training_time = training_time + client.current_epoch_transmission,
                                     s2c_time = client.current_epoch_transmission,
-                                    **client.client_instances_dict[client_id].neet_to_send())  # metadata
+                                    **client.client_instances_dict[client_id].neet_to_send())
         console.log(f"{client_id} has finished training, using {training_time}s")
         with client_lock:
             client.need_to_send_num += 1
             write_finish.clear()
         client.need_to_send_queue.put(client_2_server_data)
-
     console.log(f"{client.name} has finished testing of all selected clients")
     write_finish.wait()
     write_finish.clear()
-    # while True:
-    #     with client_lock:
-    #         if client.need_to_send_num == 0:
-    #             break # 全部发送完成，一轮全局结束
-    #     time.sleep(1) 
-
-
-
-
-
-    # =========== 开始训练 =======================
     while True:
-        # ======== 接收 ==============
         read_from_server() 
-
-
-
         if client.received_data['finished']:
             break
         console.rule(f"start {client.received_data['global_epoch']}",style='red')
@@ -533,49 +415,32 @@ def run():
         for client_id in client.current_selected_client_ids:
             assert client_id in client.client_ids , f"{client_id} do not belongs to the device" 
             current_client_instance_model_dict, training_time = client.trainer.start(client.received_data['global_epoch'],client.client_instances_dict[client_id],client.model, synchronization)
-            
             client_2_server_data = dict(
-                                        name=client.name, # 设备名称
-                                        action="upload", # 行为
-                                        client_id=client_id,  # 训练的client id号
-                                        client_model = current_client_instance_model_dict, # 模型参数
-                                        weight = len(client.client_instances_dict[client_id].selected_data_index), # 权重
-                                        s2c_training_time = training_time + client.current_epoch_transmission, # 下发与训练的时间
+                                        name=client.name,
+                                        action="upload",
+                                        client_id=client_id,
+                                        client_model = current_client_instance_model_dict,
+                                        weight = len(client.client_instances_dict[client_id].selected_data_index),
+                                        s2c_training_time = training_time + client.current_epoch_transmission,
                                         s2c_time = client.current_epoch_transmission,
-                                        **client.client_instances_dict[client_id].neet_to_send())  # metadata
+                                        **client.client_instances_dict[client_id].neet_to_send())
             console.log(f"{client_id} has finished training, using {training_time}s")
             with client_lock:
                 client.need_to_send_num += 1
                 write_finish.clear()
             client.need_to_send_queue.put(client_2_server_data)
-
         console.log(f"{client.name} has finished local training of all selected clients")
-
         write_finish.wait()
         write_finish.clear()
-        # while True:
-        #     with client_lock:
-        #         if client.need_to_send_num == 0:
-        #             break # 全部发送完成，一轮全局结束
-        #     time.sleep(1) 
-        # =============================
-
-
-
-
-
 if __name__ == '__main__':
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:
         args = yaml.safe_load(file)
     if args["set_seed"]:
         fix_random_seed(args["seed"])
-    
     socket_manager = clientsocket(args['server_ip'], args['server_port'], parser.name)
     client = Client(args, socket_manager, parser.name)
     write_daemon_thread = MyThread()
     write_daemon_thread.start()
-    
     run()
-
     client.socket_manager.close()

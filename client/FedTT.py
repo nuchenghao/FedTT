@@ -9,7 +9,6 @@ from data.utils.datasets import DATASETS_SIZE
 nvml.nvmlInit()
 import random
 import math
-
 class myFed(FedAvgTrainer):
     def __init__(self,
                  device,
@@ -32,9 +31,7 @@ class myFed(FedAvgTrainer):
         self.barrier = threading.Barrier(2)
         self.r = self.args['r']
         self.max_gpu_memory_GB = self.args['max_gpu_memory_GB']
-        # 
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
-
         self.func = {
             "loss_fixed_batch_global_loss": self.loss_fixed_batch_global_loss,
             "loss_dynamic_batch_global_loss": self.loss_dynamic_batch_global_loss,
@@ -46,11 +43,8 @@ class myFed(FedAvgTrainer):
             "woparallel":self.woparallel,
             "random_select": self.random_select
         }
-
         nvml.nvmlInit()
         self.handle = nvml.nvmlDeviceGetHandleByIndex(0) 
-
-
     def full_set(self):
         self.model.train()
         for _ in range(self.local_epoch):
@@ -66,7 +60,6 @@ class myFed(FedAvgTrainer):
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
-
     def train(self):
         cnt = 1
         while True:
@@ -88,23 +81,21 @@ class myFed(FedAvgTrainer):
                         self.optimizer.step()
                         self.train_event.record()
         torch.cuda.synchronize()
-    
-
     def loss_fixed_batch_global_loss(self):
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
-        global_loss_threshold = self.current_client.loss # 
+        global_loss_threshold = self.current_client.loss
         loss_global = torch.zeros(self.current_client.train_set_len, device=self.device, dtype=torch.float)
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
             total_correct = 0
-            itertrainloader = iter(self.trainloader)  # 
-            self.inference_to_train.put(len(itertrainloader))  # 
+            itertrainloader = iter(self.trainloader)
+            self.inference_to_train.put(len(itertrainloader))
             inputs_raw, targets_raw = next(itertrainloader)
             with torch.cuda.stream(self.inference_stream):
                 self.inputs[cnt], self.targets[cnt] = inputs_raw.to(self.device, non_blocking=True), targets_raw.to(self.device, non_blocking=True)
-                self.train_event.wait() # 
+                self.train_event.wait()
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
@@ -115,16 +106,15 @@ class myFed(FedAvgTrainer):
                         mis_classified = ~well_classified
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()
                         total_correct += len(targets_raw)
                         self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r, device=self.device)))
                         self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
                         self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
-                self.inference_event.record() # 
-                self.barrier.wait() # 
+                self.inference_event.record()
+                self.barrier.wait()
                 cnt ^= 1
-
                 for inputs_raw, targets_raw in itertrainloader:
                     self.inputs[cnt], self.targets[cnt] = inputs_raw.to(self.device, non_blocking=True), targets_raw.to(self.device,non_blocking=True)
                     self.train_event.wait()
@@ -138,7 +128,7 @@ class myFed(FedAvgTrainer):
                             mis_classified = ~well_classified
                             num_well_classified = well_classified.sum()
                             num_mis_classified = mis_classified.sum()
-                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()
                             total_correct += len(targets_raw)
                             self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                                         torch.full((num_select_well,), 1 / self.r, device=self.device)))
@@ -155,10 +145,7 @@ class myFed(FedAvgTrainer):
         self.inference_to_train.put(0)
         train_thread.join()
         self.current_client.loss = global_loss_threshold.item()
-    
-
     def loss_dynamic_batch_global_loss(self):
-        # gpu_utilization = []
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
         global_loss_threshold = self.current_client.loss
@@ -166,11 +153,9 @@ class myFed(FedAvgTrainer):
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
-            # torch.cuda.reset_peak_memory_stats() # 
-            # gpu_utilization = []
             total_correct = 0
-            itertrainloader = iter(self.trainloader)  # 
-            self.inference_to_train.put(len(itertrainloader))  # 
+            itertrainloader = iter(self.trainloader)
+            self.inference_to_train.put(len(itertrainloader))
             inputs_raw, targets_raw = next(itertrainloader)
             with torch.cuda.stream(self.inference_stream):
                 if isinstance(inputs_raw,torch.Tensor):
@@ -181,7 +166,7 @@ class myFed(FedAvgTrainer):
                     self.inputs_b[cnt] = self.inputs[cnt]
                 self.targets_b[cnt][:len(targets_raw), ...] = targets_raw.to(self.device,non_blocking=True)
                 self.targets[cnt] = self.targets_b[cnt][:len(targets_raw), ...]
-                self.train_event.wait() # 
+                self.train_event.wait()
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
@@ -192,7 +177,7 @@ class myFed(FedAvgTrainer):
                         mis_classified = ~well_classified
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()
                         total_correct += len(targets_raw)
                         self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r, device=self.device)))
@@ -205,11 +190,9 @@ class myFed(FedAvgTrainer):
                             self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                         self.targets_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
                         self.targets[cnt] = self.targets_b[cnt][:num_mis_classified + num_select_well]
-
                 self.inference_event.record()
                 self.barrier.wait()
                 cnt ^= 1
-
                 for inputs_raw, targets_raw in itertrainloader:
                     if isinstance(inputs_raw,torch.Tensor):
                         self.inputs_b[cnt][:len(targets_raw), ...] = inputs_raw.to(self.device, non_blocking=True)
@@ -230,9 +213,8 @@ class myFed(FedAvgTrainer):
                             mis_classified = ~well_classified
                             num_well_classified = well_classified.sum()
                             num_mis_classified = mis_classified.sum()
-                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()
                             total_correct += len(targets_raw)
-                            # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
                             self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                     torch.full((num_select_well,), 1 / self.r, device=self.device)))
                             if isinstance(inputs_raw,torch.Tensor):
@@ -248,13 +230,9 @@ class myFed(FedAvgTrainer):
                     cnt ^= 1
                     self.barrier.wait()
             global_loss_threshold = loss_global.mean()
-            # if sum(gpu_utilization) / len(gpu_utilization) < 95.0 and (torch.cuda.max_memory_reserved() < int(self.max_gpu_memory_GB * (1024 ** 3))):
-            #     self.trainloader.batch_sampler.batch_size = self.trainloader.batch_sampler.batch_size + 16
         self.inference_to_train.put(0)
         train_thread.join()
         self.current_client.loss = global_loss_threshold.item()
-    
-
     def classify_fixed_batch(self):
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
@@ -263,33 +241,31 @@ class myFed(FedAvgTrainer):
         cnt = 0
         for epoch in range(self.local_epoch):
             total_correct = 0
-            itertrainloader = iter(self.trainloader)  # 
-            self.inference_to_train.put(len(itertrainloader))  # 
+            itertrainloader = iter(self.trainloader)
+            self.inference_to_train.put(len(itertrainloader))
             inputs_raw, targets_raw = next(itertrainloader)
             with torch.cuda.stream(self.inference_stream):
                 self.inputs[cnt], self.targets[cnt] = inputs_raw.to(self.device, non_blocking=True), targets_raw.to(self.device, non_blocking=True)
-                self.train_event.wait() # 
+                self.train_event.wait()
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
-                        _, predicted = outputs.max(1)  # 
+                        _, predicted = outputs.max(1)
                         well_classified = self.targets[cnt] == predicted
                         mis_classified = ~well_classified
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
                         total_correct += num_well_classified
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()
                         self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r, device=self.device)))
                         self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
                         self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]),dim=0)
-
                 self.inference_event.record()
                 self.barrier.wait()
                 cnt ^= 1
-
                 for inputs_raw, targets_raw in itertrainloader:
                     self.inputs[cnt], self.targets[cnt] = inputs_raw.to(self.device, non_blocking=True), targets_raw.to(self.device, non_blocking=True)
                     self.train_event.wait()
@@ -298,18 +274,17 @@ class myFed(FedAvgTrainer):
                     with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
-                            _, predicted = outputs.max(1)  # 
+                            _, predicted = outputs.max(1)
                             well_classified = self.targets[cnt] == predicted
                             mis_classified = ~well_classified
                             num_well_classified = well_classified.sum()
                             num_mis_classified = mis_classified.sum()
                             total_correct += num_well_classified
-                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()
                             self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                     torch.full((num_select_well,), 1 / self.r, device=self.device)))
                             self.inputs[cnt] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
                             self.targets[cnt] = torch.cat((self.targets[cnt][mis_classified],self.targets[cnt][well_classified][:num_select_well]), dim=0)
-
                     self.inference_event.record()
                     cnt ^= 1
                     self.barrier.wait()
@@ -317,19 +292,14 @@ class myFed(FedAvgTrainer):
             self.trainloader.batch_sampler.batch_size = new_batch_size
         self.inference_to_train.put(0)
         train_thread.join()
-
-
     def classify_dynamic_batch(self):
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
-        # gpu_utilization = []
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
-            # torch.cuda.reset_peak_memory_stats() # 
-            # gpu_utilization = []
-            itertrainloader = iter(self.trainloader)  # 
-            self.inference_to_train.put(len(itertrainloader))  # 
+            itertrainloader = iter(self.trainloader)
+            self.inference_to_train.put(len(itertrainloader))
             inputs_raw, targets_raw = next(itertrainloader)
             with torch.cuda.stream(self.inference_stream):
                 self.train_event.wait()
@@ -346,12 +316,12 @@ class myFed(FedAvgTrainer):
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
-                        _, predicted = outputs.max(1)  # 
+                        _, predicted = outputs.max(1)
                         well_classified = self.targets[cnt] == predicted
                         mis_classified = ~well_classified
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()
                         self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r, device=self.device)))
                         if isinstance(inputs_raw,torch.Tensor):
@@ -363,11 +333,9 @@ class myFed(FedAvgTrainer):
                             self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                         self.targets_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
                         self.targets[cnt] = self.targets_b[cnt][:num_mis_classified + num_select_well]
-
                 self.inference_event.record()
                 self.barrier.wait()
                 cnt ^= 1
-
                 for inputs_raw, targets_raw in itertrainloader:
                     self.train_event.wait()
                     if isinstance(inputs_raw,torch.Tensor):
@@ -378,19 +346,17 @@ class myFed(FedAvgTrainer):
                         self.inputs_b[cnt] = self.inputs[cnt]
                     self.targets_b[cnt][:len(targets_raw), ...] = targets_raw.to(self.device,non_blocking=True)
                     self.targets[cnt] = self.targets_b[cnt][:len(targets_raw), ...]
-                    
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
                     with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
-                            _, predicted = outputs.max(1)  # 
+                            _, predicted = outputs.max(1)
                             well_classified = self.targets[cnt] == predicted
                             mis_classified = ~well_classified
                             num_well_classified = well_classified.sum()
                             num_mis_classified = mis_classified.sum()
-                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
-                            # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()
                             self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r, device=self.device)))
                             if isinstance(inputs_raw,torch.Tensor):
@@ -402,27 +368,20 @@ class myFed(FedAvgTrainer):
                                 self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                             self.targets_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
                             self.targets[cnt] = self.targets_b[cnt][:num_mis_classified + num_select_well]
-
                     self.inference_event.record()
                     self.barrier.wait()
                     cnt ^= 1
-            # if sum(gpu_utilization) / len(gpu_utilization) < 95.0 and (torch.cuda.max_memory_reserved() < int(self.max_gpu_memory_GB * (1024 ** 3))):
-            #     self.trainloader.batch_sampler.batch_size = self.trainloader.batch_sampler.batch_size + 8 
         torch.cuda.synchronize()
         self.inference_to_train.put(0)
         train_thread.join()
-
     def classify_dynamic_batch_wo_weights(self):
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
-        # gpu_utilization = []
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
-            # torch.cuda.reset_peak_memory_stats() # 
-            # gpu_utilization = []
-            itertrainloader = iter(self.trainloader)  # 
-            self.inference_to_train.put(len(itertrainloader))  # 
+            itertrainloader = iter(self.trainloader)
+            self.inference_to_train.put(len(itertrainloader))
             inputs_raw, targets_raw = next(itertrainloader)
             with torch.cuda.stream(self.inference_stream):
                 if isinstance(inputs_raw,torch.Tensor):
@@ -439,12 +398,12 @@ class myFed(FedAvgTrainer):
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
-                        _, predicted = outputs.max(1)  # 
+                        _, predicted = outputs.max(1)
                         well_classified = self.targets[cnt] == predicted
                         mis_classified = ~well_classified
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()
                         self.weights[cnt] = torch.ones(num_mis_classified + num_select_well, dtype=torch.float32, device=self.device)
                         if isinstance(inputs_raw,torch.Tensor):
                             self.inputs_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
@@ -455,11 +414,9 @@ class myFed(FedAvgTrainer):
                             self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                         self.targets_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
                         self.targets[cnt] = self.targets_b[cnt][:num_mis_classified + num_select_well]
-
                 self.inference_event.record()
                 self.barrier.wait()
                 cnt ^= 1
-
                 for inputs_raw, targets_raw in itertrainloader:
                     if isinstance(inputs_raw,torch.Tensor):
                         self.inputs_b[cnt][:len(targets_raw), ...] = inputs_raw.to(self.device, non_blocking=True)
@@ -475,13 +432,12 @@ class myFed(FedAvgTrainer):
                     with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
-                            _, predicted = outputs.max(1)  # 
+                            _, predicted = outputs.max(1)
                             well_classified = self.targets[cnt] == predicted
                             mis_classified = ~well_classified
                             num_well_classified = well_classified.sum()
                             num_mis_classified = mis_classified.sum()
-                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
-                            # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()
                             self.weights[cnt] = torch.ones(num_mis_classified + num_select_well, dtype=torch.float32, device=self.device)
                             if isinstance(inputs_raw,torch.Tensor):
                                 self.inputs_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
@@ -492,17 +448,13 @@ class myFed(FedAvgTrainer):
                                 self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                             self.targets_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
                             self.targets[cnt] = self.targets_b[cnt][:num_mis_classified + num_select_well]
-
                     self.inference_event.record()
                     self.barrier.wait()
                     cnt ^= 1
         torch.cuda.synchronize()
         self.inference_to_train.put(0)
         train_thread.join()
-
-
     def loss_dynamic_batch_global_loss_wo_weights(self):
-        # gpu_utilization = []
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
         global_loss_threshold = self.current_client.loss
@@ -510,11 +462,10 @@ class myFed(FedAvgTrainer):
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
-            torch.cuda.reset_peak_memory_stats() # 
-            # gpu_utilization = []
+            torch.cuda.reset_peak_memory_stats()
             total_correct = 0
-            itertrainloader = iter(self.trainloader)  # 
-            self.inference_to_train.put(len(itertrainloader))  # 
+            itertrainloader = iter(self.trainloader)
+            self.inference_to_train.put(len(itertrainloader))
             inputs_raw, targets_raw = next(itertrainloader)
             with torch.cuda.stream(self.inference_stream):
                 if isinstance(inputs_raw,torch.Tensor):
@@ -525,7 +476,7 @@ class myFed(FedAvgTrainer):
                     self.inputs_b[cnt] = self.inputs[cnt]
                 self.targets_b[cnt][:len(targets_raw), ...] = targets_raw.to(self.device,non_blocking=True)
                 self.targets[cnt] = self.targets_b[cnt][:len(targets_raw), ...]
-                self.train_event.wait() # 
+                self.train_event.wait()
                 self.inference_net.load_state_dict(self.model.state_dict())
                 self.inference_net.eval()
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
@@ -536,7 +487,7 @@ class myFed(FedAvgTrainer):
                         mis_classified = ~well_classified
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()
                         total_correct += len(targets_raw)
                         self.weights[cnt] = torch.ones(num_mis_classified + num_select_well, dtype=torch.float32, device=self.device)
                         if isinstance(inputs_raw,torch.Tensor):
@@ -551,7 +502,6 @@ class myFed(FedAvgTrainer):
                 self.inference_event.record()
                 self.barrier.wait()
                 cnt ^= 1
-
                 for inputs_raw, targets_raw in itertrainloader:
                     if isinstance(inputs_raw,torch.Tensor):
                         self.inputs_b[cnt][:len(targets_raw), ...] = inputs_raw.to(self.device, non_blocking=True)
@@ -572,9 +522,8 @@ class myFed(FedAvgTrainer):
                             mis_classified = ~well_classified
                             num_well_classified = well_classified.sum()
                             num_mis_classified = mis_classified.sum()
-                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()
                             total_correct += len(targets_raw)
-                            # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
                             self.weights[cnt] = torch.ones(num_mis_classified + num_select_well, dtype=torch.float32, device=self.device)
                             if isinstance(inputs_raw,torch.Tensor):
                                 self.inputs_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.inputs[cnt][mis_classified], self.inputs[cnt][well_classified][:num_select_well]),dim=0)
@@ -592,18 +541,14 @@ class myFed(FedAvgTrainer):
         self.inference_to_train.put(0)
         train_thread.join()
         self.current_client.loss = global_loss_threshold.item()
-
     def classify_dynamic_batch_SD(self):
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
-        # gpu_utilization = []
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
-            # torch.cuda.reset_peak_memory_stats() # 
-            # gpu_utilization = []
-            itertrainloader = iter(self.trainloader)  # 
-            self.inference_to_train.put(len(itertrainloader))  # 
+            itertrainloader = iter(self.trainloader)
+            self.inference_to_train.put(len(itertrainloader))
             inputs_raw, targets_raw = next(itertrainloader)
             with torch.cuda.stream(self.inference_stream):
                 self.train_event.wait()
@@ -620,12 +565,12 @@ class myFed(FedAvgTrainer):
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
-                        _, predicted = outputs.max(1)  # 
+                        _, predicted = outputs.max(1)
                         well_classified = self.targets[cnt] == predicted
                         mis_classified = ~well_classified
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()
                         self.weights[cnt] = torch.cat((torch.full((num_mis_classified,), (num_mis_classified + num_select_well) / len(targets_raw), dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r * (num_mis_classified + num_select_well) / len(targets_raw), device=self.device)))
                         if isinstance(inputs_raw,torch.Tensor):
@@ -637,11 +582,9 @@ class myFed(FedAvgTrainer):
                             self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                         self.targets_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
                         self.targets[cnt] = self.targets_b[cnt][:num_mis_classified + num_select_well]
-
                 self.inference_event.record()
                 self.barrier.wait()
                 cnt ^= 1
-
                 for inputs_raw, targets_raw in itertrainloader:
                     self.train_event.wait()
                     if isinstance(inputs_raw,torch.Tensor):
@@ -652,19 +595,17 @@ class myFed(FedAvgTrainer):
                         self.inputs_b[cnt] = self.inputs[cnt]
                     self.targets_b[cnt][:len(targets_raw), ...] = targets_raw.to(self.device,non_blocking=True)
                     self.targets[cnt] = self.targets_b[cnt][:len(targets_raw), ...]
-                    
                     self.inference_net.load_state_dict(self.model.state_dict())
                     self.inference_net.eval()
                     with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
-                            _, predicted = outputs.max(1)  # 
+                            _, predicted = outputs.max(1)
                             well_classified = self.targets[cnt] == predicted
                             mis_classified = ~well_classified
                             num_well_classified = well_classified.sum()
                             num_mis_classified = mis_classified.sum()
-                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
-                            # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()
                             self.weights[cnt] = torch.cat((torch.full((num_mis_classified,), (num_mis_classified + num_select_well) / len(targets_raw), dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r * (num_mis_classified + num_select_well) / len(targets_raw), device=self.device)))
                             if isinstance(inputs_raw,torch.Tensor):
@@ -676,17 +617,12 @@ class myFed(FedAvgTrainer):
                                 self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                             self.targets_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
                             self.targets[cnt] = self.targets_b[cnt][:num_mis_classified + num_select_well]
-
                     self.inference_event.record()
                     self.barrier.wait()
                     cnt ^= 1
-            # if sum(gpu_utilization) / len(gpu_utilization) < 95.0 and (torch.cuda.max_memory_reserved() < int(self.max_gpu_memory_GB * (1024 ** 3))):
-            #     self.trainloader.batch_sampler.batch_size = self.trainloader.batch_sampler.batch_size + 8 
         torch.cuda.synchronize()
         self.inference_to_train.put(0)
         train_thread.join()
-
-
     def woparallel(self):
         for _ in range(self.local_epoch):
             for inputs, targets in self.trainloader:
@@ -697,14 +633,13 @@ class myFed(FedAvgTrainer):
                 targets = targets.to(self.device,non_blocking=True)
                 self.model.eval()
                 with torch.no_grad():
-                    # with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         outputs = self.model(inputs)
-                        _, predicted = outputs.max(1)  # 
+                        _, predicted = outputs.max(1)
                         well_classified = targets == predicted
                         mis_classified = ~well_classified
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()
                         weights = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                     torch.full((num_select_well,), 1 / self.r, device=self.device)))
                         inputs = torch.cat((inputs[mis_classified], inputs[well_classified][:num_select_well]),dim=0)
@@ -717,7 +652,6 @@ class myFed(FedAvgTrainer):
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
-
     def random_select(self):
         self.model.train()
         for _ in range(self.local_epoch):
@@ -729,7 +663,7 @@ class myFed(FedAvgTrainer):
                 else:
                     inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
                 targets = targets.to(self.device,non_blocking=True)
-                random_num = random.choice(range(lower, upper + 1))  # +1  upper
+                random_num = random.choice(range(lower, upper + 1))
                 index = random.sample(range(len(targets)), random_num)
                 inputs = inputs[index].contiguous()
                 targets = targets[index].contiguous()
@@ -739,14 +673,12 @@ class myFed(FedAvgTrainer):
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
-
-
     def local_train(self):
         if self.args["algorithm"] == "woparallel" or self.args["algorithm"] == "random_select":
             self.func[self.args["algorithm"]]()
         elif self.synchronization['prune'] and self.current_client.participation_times > 0:
             self.func[self.args["algorithm"]]()
-            self.current_client.batch_size = self.trainloader.batch_sampler.batch_size  # 
+            self.current_client.batch_size = self.trainloader.batch_sampler.batch_size
         else:
             self.full_set()
-            self.current_client.batch_size = self.trainloader.batch_sampler.batch_size  # 
+            self.current_client.batch_size = self.trainloader.batch_sampler.batch_size

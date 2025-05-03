@@ -15,7 +15,6 @@ from torch.utils.data import DataLoader
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 sys.path.append(PROJECT_DIR.as_posix())
 sys.path.append(PROJECT_DIR.joinpath("src").as_posix())
-
 from utls.utils import (
     TRAIN_LOG,
     Logger,
@@ -30,26 +29,20 @@ from client.fedbalancer import fedbalancerClient,fedbalancerTrainer
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS_COLLATE_FN
 from utls.dataset import NeedIndexDataset
-
 class fedbalancer(FedAvgServer):
     def __init__(self, args = None, trainer_type=fedbalancerTrainer, client_type=fedbalancerClient):
         super().__init__(args, trainer_type, client_type)
-        # -------------------- 设置batch的训练时间 --------------------------------
         self.batch_training_time = self.batch_training_time()
         for client_instance in self.client_instances:
             client_instance.batch_training_time = self.batch_training_time
         self.logger.log(f"========= batch_training_time: {self.batch_training_time}===========")
-
-        # -------------------- 设置训练集和数据加载器--------------------------
         self.trainset = NeedIndexDataset(self.trainset)
         self.train_sampler = self.trainset.sampler
         self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
                                       pin_memory=True, num_workers=4, collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],persistent_workers=True,
                                       sampler=self.train_sampler, pin_memory_device=self.device,prefetch_factor = 8)
         self.cuda_0_trainer.trainloader = self.trainloader
-
-        self.current_global_epoch = 0 # 已完成的次数
-
+        self.current_global_epoch = 0
         self.ltr = 0.0
         self.ddlr = 1.0 
         self.ddl_R = 0.0
@@ -58,12 +51,10 @@ class fedbalancer(FedAvgServer):
         self.w = 5
         self.lss =0.05
         self.dss = 0.05
-
-    
     def batch_training_time(self):
         model = MODEL_DICT[self.args["model"]](DATA_NUM_CLASSES_DICT[self.args['dataset']]).to(self.device)
         model.train()
-        criterion = torch.nn.CrossEntropyLoss(label_smoothing = 0.1).to(self.device)  # label_smoothing的默认值为0.1
+        criterion = torch.nn.CrossEntropyLoss(label_smoothing = 0.1).to(self.device)
         optimizer = torch.optim.SGD(model.parameters(),
                           lr=0.1,
                           momentum=0.0,
@@ -86,15 +77,12 @@ class fedbalancer(FedAvgServer):
                 optimizer.step()
             end.record()
             torch.cuda.synchronize()
-            train_time.append(start.elapsed_time(end)/len(self.trainloader)/1000.0)# 每个batch的时间，单位为s
+            train_time.append(start.elapsed_time(end)/len(self.trainloader)/1000.0)
         return sum(train_time) / len(train_time)
-
     def lt_selection_next_round(self,LLow,LHigh):
-        #  𝑙𝑡 selection for next (𝑅 + 1)-th round  (Algorithm 2)
         ll = min(LLow)
         lh = sum(LHigh) / len(LHigh)
         self.lt = ll + (lh - ll) * self.ltr
-
     def ltr_ddlr_control(self,LSum_R,L_R):
         self.U.append( LSum_R / (L_R * self.ddl_R))
         if self.current_global_epoch % self.w == 0 :
@@ -104,7 +92,6 @@ class fedbalancer(FedAvgServer):
             else:
                 self.ltr = max(self.ltr - self.lss , 0.0)
                 self.ddlr = min(self.ddlr + self.dss , 1.0)
-        
     def select_deadline(self,E):
         def find_peak_ddl_E(epoch):
             completeTime = []
@@ -124,12 +111,9 @@ class fedbalancer(FedAvgServer):
         dl = find_peak_ddl_E(1)
         dh = find_peak_ddl_E(E)
         self.ddl_R = dl + (dh - dl) * self.ddlr
-
-            
-
     def train_one_round(self,global_round):
-        client_model_cache = []  # 缓存梯度
-        weight_cache = []  # 缓存梯度对应的权重
+        client_model_cache = []
+        weight_cache = []
         client_training_time = []
         LLow = []
         LHigh = []
@@ -164,19 +148,13 @@ class fedbalancer(FedAvgServer):
             LHigh.append(modified_client_instance.metadata['lhigh'])
             Lsum.append(modified_client_instance.metadata['lsum'])
             client_training_time.append(round(modified_client_instance.training_time * 10.0))
-            self.client_instances[modified_client_instance.client_id] = modified_client_instance  # 更新client信息
+            self.client_instances[modified_client_instance.client_id] = modified_client_instance
         L_R = sum(weight_cache)
-        # 聚合并更新参数
         self.current_global_epoch += 1 
-        self.aggregate(client_model_cache, weight_cache)  # 聚合梯度
+        self.aggregate(client_model_cache, weight_cache)
         self.lt_selection_next_round(LLow,LHigh)
         self.ltr_ddlr_control(sum(Lsum),L_R)
-        
-        
         return max(client_training_time)
-
-
-
 if __name__ == "__main__":
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

@@ -11,25 +11,17 @@ from utls.dataset import NeedIndexDataset
 from torch.utils.data import DataLoader
 from data.utils.datasets import DATASETS_COLLATE_FN
 from utls.dataset import NeedIndexDataset
-
-# os.environ['CUDA_LAUNCH_BLOCKING'] = '1' # debug
-
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 sys.path.append(PROJECT_DIR.as_posix())
 sys.path.append(PROJECT_DIR.joinpath("src").as_posix())
-
-
-
 class myFedServer(FedAvgServer):
     def __init__(self, args):
         super().__init__(args=args, trainer_type=myFed)
         self.current_global_epoch = 0
         self.need_to_keep = int(self.args['global_epoch'] * self.args['start'])
-
-
     def train_one_round(self,global_round):
-        client_model_cache = []  # 缓存梯度
-        weight_cache = []  # 缓存梯度对应的权重
+        client_model_cache = []
+        weight_cache = []
         client_training_time = []
         trainer_synchronization = {"round":global_round,'prune': False,"accuracy":self.accuracy / 100.}
         if self.current_global_epoch >= self.need_to_keep:
@@ -58,13 +50,10 @@ class myFedServer(FedAvgServer):
             client_model_cache.append(client_model)
             weight_cache.append(modified_client_instance.train_set_len)
             client_training_time.append(round(modified_client_instance.training_time * 10.0))
-            self.client_instances[modified_client_instance.client_id] = modified_client_instance  # 更新client信息
-        # 聚合并更新参数
-        self.aggregate(client_model_cache, weight_cache)  # 聚合梯度
+            self.client_instances[modified_client_instance.client_id] = modified_client_instance
+        self.aggregate(client_model_cache, weight_cache)
         self.current_global_epoch += 1
         return max(client_training_time)
-
-
 if __name__ == '__main__':
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

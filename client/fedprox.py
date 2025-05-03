@@ -15,14 +15,12 @@ from torch.func import grad, vmap
 import threading
 from data.utils.datasets import DATASETS_SIZE
 import queue
-
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 from utls.utils import NN_state_load, evaluate
 from data.utils.datasets import DATASETS
 from utls.utils import Timer
 from collections import defaultdict
 from client.fedavg import BaseClient,FedAvgTrainer
-
 class FedProxTrainer(FedAvgTrainer):
     def __init__(self, device, model, trainloader, testloader, args):
         super().__init__(device, model, trainloader, testloader, args)
@@ -41,17 +39,12 @@ class FedProxTrainer(FedAvgTrainer):
         self.barrier = threading.Barrier(2)
         self.finish_one_epoch = threading.Event()
         self.r = self.args['r']
-        # 
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
-
-
-    
     def set_parameters(self, optimizer_state_dict, trainer_synchronization):
-        self.optimizer.load_state_dict(optimizer_state_dict)  # 
+        self.optimizer.load_state_dict(optimizer_state_dict)
         self.model.load_state_dict(self.current_client.model_dict)
         self.synchronization = trainer_synchronization
         self.global_model = self.current_client.model_dict
-
     def full_set(self):
         self.model.train()
         for _ in range(self.local_epoch):
@@ -63,7 +56,7 @@ class FedProxTrainer(FedAvgTrainer):
                 targets = targets.to(self.device,non_blocking=True)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets).mean() # 
+                loss = self.criterion(outputs, targets).mean()
                 proximal_term = 0.0
                 for name, param in self.model.named_parameters():
                     proximal_term += (param - self.global_model[name]).norm(2)
@@ -71,7 +64,6 @@ class FedProxTrainer(FedAvgTrainer):
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
-    
     def train(self):
         cnt = 1
         while True:
@@ -97,18 +89,14 @@ class FedProxTrainer(FedAvgTrainer):
                         self.optimizer.step()
                         self.train_event.record()
         torch.cuda.synchronize()
-    
     def my(self):
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
-        # gpu_utilization = []
         self.train_event.record()
         cnt = 0
         for epoch in range(self.local_epoch):
-            # torch.cuda.reset_peak_memory_stats() # 
-            # gpu_utilization = []
-            itertrainloader = iter(self.trainloader)  # 
-            self.inference_to_train.put(len(itertrainloader))  # 
+            itertrainloader = iter(self.trainloader)
+            self.inference_to_train.put(len(itertrainloader))
             inputs_raw, targets_raw = next(itertrainloader)
             with torch.cuda.stream(self.inference_stream):
                 if isinstance(inputs_raw,torch.Tensor):
@@ -125,12 +113,12 @@ class FedProxTrainer(FedAvgTrainer):
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     with torch.no_grad():
                         outputs = self.inference_net(self.inputs[cnt])
-                        _, predicted = outputs.max(1)  # 
+                        _, predicted = outputs.max(1)
                         well_classified = self.targets[cnt] == predicted
                         mis_classified = ~well_classified
                         num_well_classified = well_classified.sum()
                         num_mis_classified = mis_classified.sum()
-                        num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
+                        num_select_well = torch.ceil(num_well_classified * self.r).int()
                         self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r, device=self.device)))
                         if isinstance(inputs_raw,torch.Tensor):
@@ -142,11 +130,9 @@ class FedProxTrainer(FedAvgTrainer):
                             self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                         self.targets_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
                         self.targets[cnt] = self.targets_b[cnt][:num_mis_classified + num_select_well]
-
                 self.inference_event.record()
                 self.barrier.wait()
                 cnt ^= 1
-
                 for inputs_raw, targets_raw in itertrainloader:
                     if isinstance(inputs_raw,torch.Tensor):
                         self.inputs_b[cnt][:len(targets_raw), ...] = inputs_raw.to(self.device, non_blocking=True)
@@ -162,13 +148,12 @@ class FedProxTrainer(FedAvgTrainer):
                     with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                         with torch.no_grad():
                             outputs = self.inference_net(self.inputs[cnt])
-                            _, predicted = outputs.max(1)  # 
+                            _, predicted = outputs.max(1)
                             well_classified = self.targets[cnt] == predicted
                             mis_classified = ~well_classified
                             num_well_classified = well_classified.sum()
                             num_mis_classified = mis_classified.sum()
-                            num_select_well = torch.ceil(num_well_classified * self.r).int()  # 
-                            # gpu_utilization.append(nvml.nvmlDeviceGetUtilizationRates(self.handle).gpu)
+                            num_select_well = torch.ceil(num_well_classified * self.r).int()
                             self.weights[cnt] = torch.cat((torch.ones(num_mis_classified, dtype=torch.float32, device=self.device),
                                 torch.full((num_select_well,), 1 / self.r, device=self.device)))
                             if isinstance(inputs_raw,torch.Tensor):
@@ -180,21 +165,14 @@ class FedProxTrainer(FedAvgTrainer):
                                 self.inputs[cnt][0],self.inputs[cnt][2]=self.inputs[cnt][0].permute(1, 0, 2),self.inputs[cnt][2].permute(1, 0, 2)
                             self.targets_b[cnt][:num_mis_classified + num_select_well] = torch.cat((self.targets[cnt][mis_classified], self.targets[cnt][well_classified][:num_select_well]), dim=0)
                             self.targets[cnt] = self.targets_b[cnt][:num_mis_classified + num_select_well]
-
                     self.inference_event.record()
                     self.barrier.wait()
                     cnt ^= 1
-            # if sum(gpu_utilization) / len(gpu_utilization) < 95.0 and (torch.cuda.max_memory_reserved() < int(self.max_gpu_memory_GB * (1024 ** 3))):
-            #     self.trainloader.batch_sampler.batch_size = self.trainloader.batch_sampler.batch_size + 8 
         torch.cuda.synchronize()
         self.inference_to_train.put(0)
         train_thread.join()
-
-
-
     def local_train(self):
         if self.args['algorithm'] == 'fedprox' or self.current_client.participation_times == 0:
             self.full_set()
         else:
             self.my()
-        

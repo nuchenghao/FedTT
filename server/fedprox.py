@@ -19,7 +19,6 @@ from tqdm import tqdm
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 sys.path.append(PROJECT_DIR.as_posix())
 sys.path.append(PROJECT_DIR.joinpath("src").as_posix())
-
 from utls.utils import (
     TRAIN_LOG,
     Logger,
@@ -34,15 +33,9 @@ from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLA
 from utls.dataset import CustomSampler
 from server.fedavg import FedAvgServer
 from client.fedprox import FedProxTrainer
-
-
 class FedProxServer(FedAvgServer):
     def __init__(self, args = None, trainer_type=FedProxTrainer, client_type=BaseClient):
         super().__init__(args, trainer_type, client_type)
-
-
-
-
 if __name__ == "__main__":
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:
