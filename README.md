@@ -1,3 +1,6 @@
+Repertory for *It Takes Two: Accelerating Accurate Federated Learning through Pipelined Intra-Batch Data Sampling and Training*
+
+
 # <font style="color:rgb(44, 44, 54);">The hardware configuration of the workstation is as follows:</font>
 + CPU: AMD Ryzen 9 7950X 16-Core Processor
 + GPU: NVIDIA 4090 * 2
