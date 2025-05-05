@@ -1,28 +1,33 @@
 algorithm: fedavg
-model: resnet34 # resnet18、
-dataset: cinic10 #cinic10、
+dataset: cinic10
+model: resnet34
+
+set_seed: true
+seed: 16
 
 
-set_seed: True # True为设置种子，False为性能测试
-seed: 16 # 注意修改data中的seed;
+client_num: 100
 
-client_num: 100 #客户端数量
-client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
+batch_size: 512 # trainloader batch size
+t_batch_size: 2048 # testloader batch size
+
+client_join_ratio: 0.3
 global_epoch: 300
 local_epoch: 4
-batch_size: 512 # Data batch size for client local training.
-t_batch_size: 2048
-client_eval: False
 
-lr: 0.01 # Learning rate for client local training.
-momentum: 0.0 # Momentum for client local opitimizer.
-weight_decay: 0.0 # Weight decay for client local optimizer.
+# optimizer
+lr: 0.01
+momentum: 0.0
+weight_decay: 0.0
 
-# record
-save_log: 1 # Non-zero value for saving algorithm running log 
+save_log: 1
 
-# wandb记录
+# wandb setting
 wandb: 1
-project: "resnet34_cinic10_16_dir_3"
-experiment_name: "fedavg_512"
-device: "cuda:0"
+project: cinic10_16
+experiment_name: fedavg_512
+
+
+client_eval: false
+
+device: cuda:0

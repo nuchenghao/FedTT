@@ -17,11 +17,13 @@ import threading
 from utls.utils import  evaluate
 from utls.utils import Timer
 from client.fedavg import BaseClient,FedAvgTrainer
+
 class FedNovaClient(BaseClient):
     def __init__(self, client_id, train_index, batch_size):
         super().__init__(client_id, train_index, batch_size)
         self.coeff = None
         self.norm_grad = None
+
 class FedNovaTrainer(FedAvgTrainer):
     def __init__(self, device, model, trainloader, testloader, args):
         super().__init__(device, model, trainloader, testloader, args)
@@ -43,11 +45,13 @@ class FedNovaTrainer(FedAvgTrainer):
         self.finish_one_epoch = threading.Event()
         self.r = self.args['r']
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
+
     def set_parameters(self, optimizer_state_dict, trainer_synchronization):
         self.optimizer.load_state_dict(optimizer_state_dict)
         self.model.load_state_dict(self.current_client.model_dict)
         self.synchronization = trainer_synchronization
         self.global_model = self.current_client.model_dict
+
     def full_set(self):
         self.model.train()
         tau = 0
@@ -70,6 +74,7 @@ class FedNovaTrainer(FedAvgTrainer):
         state_dict = self.model.state_dict()
         for key in self.current_client.norm_grad:
             self.current_client.norm_grad[key] = torch.div(self.current_client.model_dict[key] - state_dict[key], self.current_client.coeff)
+    
     def train(self):
         cnt = 1
         tau = 0
@@ -98,7 +103,8 @@ class FedNovaTrainer(FedAvgTrainer):
         state_dict = self.model.state_dict()
         for key in self.current_client.norm_grad:
             self.current_client.norm_grad[key] = torch.div(self.current_client.model_dict[key] - state_dict[key], self.current_client.coeff)
-    def my(self):
+    
+    def fednova_FedTT(self):
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
         self.train_event.record()
@@ -180,8 +186,9 @@ class FedNovaTrainer(FedAvgTrainer):
         torch.cuda.synchronize()
         self.inference_to_train.put(0)
         train_thread.join()
+    
     def local_train(self):
         if self.args['algorithm'] == 'fednova' or self.current_client.participation_times == 0:
             self.full_set()
         else:
-            self.my()
+            self.fednova_FedTT()

@@ -4,7 +4,7 @@ import sys
 import yaml
 from fedavg import FedAvgServer
 from utls.utils import get_argparser, fix_random_seed
-from client.my import myFed
+from client.FedTT import FedTTClient
 from rich.console import Console
 import os
 from utls.dataset import NeedIndexDataset
@@ -14,18 +14,18 @@ from utls.dataset import NeedIndexDataset
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 sys.path.append(PROJECT_DIR.as_posix())
 sys.path.append(PROJECT_DIR.joinpath("src").as_posix())
-class myFedServer(FedAvgServer):
+
+class FedTTServer(FedAvgServer):
     def __init__(self, args):
-        super().__init__(args=args, trainer_type=myFed)
+        super().__init__(args=args, trainer_type=FedTTClient)
         self.current_global_epoch = 0
-        self.need_to_keep = int(self.args['global_epoch'] * self.args['start'])
+
     def train_one_round(self,global_round):
         client_model_cache = []
         weight_cache = []
         client_training_time = []
-        trainer_synchronization = {"round":global_round,'prune': False,"accuracy":self.accuracy / 100.}
-        if self.current_global_epoch >= self.need_to_keep:
-            trainer_synchronization['prune'] = True
+        trainer_synchronization = {"round":global_round, 'prune': True,"accuracy": self.accuracy / 100.}
+
         for client_id in self.current_selected_client_ids:
             assert self.client_instances[client_id].client_id == client_id
             self.client_instances[client_id].model_dict = self.model.state_dict()
@@ -60,5 +60,5 @@ if __name__ == '__main__':
         args = yaml.safe_load(file)
     if args["set_seed"]:
         fix_random_seed(args["seed"])
-    server = myFedServer(args=args)
+    server = FedTTServer(args=args)
     server.train()

@@ -3,8 +3,8 @@ model: biRNN
 dataset: snli 
 
 
-set_seed: True # True为设置种子，False为性能测试
-seed: 166666 # 注意修改data中的seed;
+set_seed: True 
+seed: 166666 
 
 
 global_epoch: 30
@@ -16,8 +16,8 @@ momentum: 0.0 # Momentum for client local opitimizer.
 weight_decay: 0.0 # Weight decay for client local optimizer.
 
 
-# wandb记录
+# wandb record
 wandb: 1
-project: "biRNN_snli_166666_dir_3"
+project: "snli_166666"
 experiment_name: "centralized training"
 device: "cuda:0"

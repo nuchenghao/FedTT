@@ -21,6 +21,7 @@ from data.utils.datasets import DATASETS
 from utls.utils import Timer
 from collections import defaultdict
 from client.fedavg import BaseClient,FedAvgTrainer
+
 class FedProxTrainer(FedAvgTrainer):
     def __init__(self, device, model, trainloader, testloader, args):
         super().__init__(device, model, trainloader, testloader, args)
@@ -40,11 +41,13 @@ class FedProxTrainer(FedAvgTrainer):
         self.finish_one_epoch = threading.Event()
         self.r = self.args['r']
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
+
     def set_parameters(self, optimizer_state_dict, trainer_synchronization):
         self.optimizer.load_state_dict(optimizer_state_dict)
         self.model.load_state_dict(self.current_client.model_dict)
         self.synchronization = trainer_synchronization
         self.global_model = self.current_client.model_dict
+
     def full_set(self):
         self.model.train()
         for _ in range(self.local_epoch):
@@ -64,6 +67,7 @@ class FedProxTrainer(FedAvgTrainer):
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
+
     def train(self):
         cnt = 1
         while True:
@@ -89,7 +93,8 @@ class FedProxTrainer(FedAvgTrainer):
                         self.optimizer.step()
                         self.train_event.record()
         torch.cuda.synchronize()
-    def my(self):
+
+    def fedprox_FedTT(self):
         train_thread = threading.Thread(target=self.train, args=())
         train_thread.start()
         self.train_event.record()
@@ -171,8 +176,9 @@ class FedProxTrainer(FedAvgTrainer):
         torch.cuda.synchronize()
         self.inference_to_train.put(0)
         train_thread.join()
+
     def local_train(self):
         if self.args['algorithm'] == 'fedprox' or self.current_client.participation_times == 0:
             self.full_set()
         else:
-            self.my()
+            self.fedprox_FedTT()

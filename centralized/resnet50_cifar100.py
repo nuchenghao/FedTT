@@ -21,6 +21,8 @@ from utls.utils import (
 from utls.utils import Timer
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS
+
+
 if __name__=='__main__':
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:
