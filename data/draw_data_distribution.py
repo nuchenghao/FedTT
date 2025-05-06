@@ -1,6 +1,7 @@
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+
 def draw_data_distribution(file_path, client_num, classes_num):
     with open(file_path, 'r', encoding='utf-8') as file:
         data = json.load(file)

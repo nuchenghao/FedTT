@@ -1,0 +1,33 @@
+algorithm: fednova_FedTT
+dataset: cifar100
+model: resnet50
+
+set_seed: true
+seed: 166
+
+
+client_num: 30
+
+batch_size: 96 # trainloader batch size
+t_batch_size: 2048 # testloader batch size
+
+client_join_ratio: 0.3 # Each time, client_join_ratio * client_num clients are selected to participate in training.
+global_epoch: 300
+local_epoch: 4
+
+# parameter for torch.optim.SGD
+lr: 0.01
+momentum: 0.0
+weight_decay: 0.0
+
+
+# wandb setting
+wandb: 1 # wandb: 1 record, 0 not
+project: cifar100_166
+experiment_name: fednova_FedTT
+
+r: 0.3 # retention rate
+
+client_eval: false # Whether to perform testing on the client side.
+save_log: 1 # Store output logs locally.
+device: cuda:0

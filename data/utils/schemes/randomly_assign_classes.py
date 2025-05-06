@@ -3,6 +3,7 @@ from collections import Counter
 from typing import Dict, List, Tuple
 import numpy as np
 from torch.utils.data import Dataset
+
 def randomly_assign_classes(
     dataset: Dataset, client_num: int, class_num: int
 ) -> Tuple[List[List[int]], Dict[str, Dict[str, int]]]:

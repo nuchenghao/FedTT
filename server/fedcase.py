@@ -34,11 +34,13 @@ from server.fedavg import FedAvgServer
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATASETS_COLLATE_FN
 from utls.dataset import NeedIndexDataset
+
 class FedCaseDataset(NeedIndexDataset):
     def __init__(self, dataset):
         super().__init__(dataset)
         self.frequency = torch.zeros(len(self.dataset),dtype=torch.int32)
         self.experience = torch.zeros(len(self.dataset),dtype=torch.float32)
+    
     def update(self,loss , values , device,loss_ = True):
         batch_size = loss.shape[0]
         assert len(self.cur_batch_index) == batch_size and isinstance(loss, torch.Tensor)
@@ -46,6 +48,7 @@ class FedCaseDataset(NeedIndexDataset):
         self.value[self.cur_batch_index.long()] = value_val.cpu()
         self.frequency[self.cur_batch_index.long()] += 1
         return loss.mean()
+    
     def get_value(self,index : np.array):
         M_u_ = torch.max(self.value[index]) - torch.min(self.value[index])
         M_u_ = M_u_ if M_u_ !=0 else 1
@@ -56,6 +59,7 @@ class FedCaseDataset(NeedIndexDataset):
         assert len(self.experience[index]) == len(M_u + T_u)
         self.experience[index] = M_u + T_u
         return self.experience[index]
+
 class FedCaSeServer(FedAvgServer):
     def __init__(self, args = None, trainer_type=FedCaSeTrainer, client_type=FedCaSeClient):
         super().__init__(args, trainer_type, client_type)
@@ -77,6 +81,7 @@ class FedCaSeServer(FedAvgServer):
         self.prev_l = 0.0
         self.prev_t = 0.0
         self.regression_model = RandomForestRegressor(n_estimators=100, random_state=42)
+    
     def collect_client_exp(self):
         D,L =[],[]
         for client_id in self.current_selected_client_ids :
@@ -91,11 +96,13 @@ class FedCaSeServer(FedAvgServer):
             client_experience = self.alpha * ci + self.beta * cm
             self.F[client_id] = client_experience
         return max(D) 
+    
     def get_round_diff(self,loss):
         round_train_time = self.collect_client_exp()
         self.delta_l.append(self.prev_l - loss)
         self.delta_d.append(round_train_time - self.prev_t)
         return round_train_time
+    
     def find_EN(self):
         T_l = max(self.delta_l) + np.std(self.delta_l,ddof=0)
         T_D = min(self.delta_d) - np.std(self.delta_d,ddof=0)
@@ -108,6 +115,7 @@ class FedCaSeServer(FedAvgServer):
         new_point = np.array([[T_l, T_D, T_l / T_D]])
         rho = self.regression_model.predict(new_point)[0]
         return rho
+    
     def Client_Scheduling(self,epoch):
         if epoch >= int(self.args['global_epoch'] * 0.1):
             rho = self.find_EN()
@@ -126,6 +134,7 @@ class FedCaSeServer(FedAvgServer):
         len_nc = int(self.client_num * self.args['client_join_ratio']) - E_clients
         self.current_selected_client_ids = sorted_client_id[:E_clients]
         self.current_selected_client_ids.extend(random.sample(sorted_client_id[E_clients:],k=len_nc))
+    
     def train(self):
         global_loss = 0
         round_train_time = 0 
@@ -146,6 +155,7 @@ class FedCaSeServer(FedAvgServer):
             round_train_time = self.get_round_diff(global_loss)
         for client_instance in self.client_instances:
             self.logger.log(f"Client{client_instance.client_id}'s training time : {client_instance.training_time_record}")
+    
     def train_one_round(self,global_round):
         client_model_cache = []
         weight_cache = []
@@ -178,6 +188,7 @@ class FedCaSeServer(FedAvgServer):
             self.client_instances[modified_client_instance.client_id] = modified_client_instance
         self.aggregate(client_model_cache, weight_cache)
         return max(client_training_time)
+    
 if __name__ == "__main__":
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

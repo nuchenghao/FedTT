@@ -1,15 +1,25 @@
 algorithm: centralized
-batch_size: 128
 dataset: cinic10
-device: cuda:0
-experiment_name: centralized training
-global_epoch: 100
-lr: 0.01
 model: resnet34
-momentum: 0.0
-project: cinic10_1666
-seed: 1666
+
 set_seed: true
-t_batch_size: 2048
-wandb: 1
+seed: 1666
+
+batch_size: 128 # trainloader batch size
+t_batch_size: 2048 # testloader batch size
+
+global_epoch: 100
+
+# wandb setting
+wandb: 1 # wandb: 1 record, 0 not
+project: cinic10_1666
+experiment_name: centralized training
+
+# parameter for torch.optim.SGD
+lr: 0.01
+momentum: 0.0
 weight_decay: 0.0
+
+
+
+device: cuda:0

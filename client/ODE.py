@@ -22,6 +22,7 @@ compute_heterogeneity = [1.0, 1.46, 1.89, 2.0]
 probability = [0.45, 0.25, 0.2, 0.1]
 with open(PROJECT_DIR / "utls" / "network_distribution.json", 'r') as f:
     network_distribution = json.load(f)
+
 class ODEClient(BaseClient):
     def __init__(self, client_id, train_index, batch_size):
         super().__init__(client_id, train_index, batch_size)
@@ -34,10 +35,12 @@ class ODEClient(BaseClient):
         self.label_weight = {}
         self.weights_tensor = None
         self.new_weight4aggregation = 0.0
+
 class ODETrainer(FedAvgTrainer):
     def __init__(self, device, model, trainloader, testloader, args):
         super().__init__(device, model, trainloader, testloader, args)
         self.criterion_ = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
+
     def get_client_grad(self , client_instance , factor):
         self.current_client = client_instance
         self.model.load_state_dict(self.current_client.model_dict)
@@ -76,10 +79,12 @@ class ODETrainer(FedAvgTrainer):
             if isinstance(module,__NormBase):
                 module.track_running_stats = True
         return [factor * _grad for _grad in gradient]
+    
     def loss_fn(self,params, data, target):
         output = torch.func.functional_call(self.model, params, (data.unsqueeze(0),))
         loss = self.criterion(output, target.unsqueeze(0))
         return loss
+    
     def update_client_buffer(self,client_instance,global_gradient,batch_size):
         self.current_client = client_instance
         self.model.load_state_dict(self.current_client.model_dict)
@@ -132,9 +137,11 @@ class ODETrainer(FedAvgTrainer):
             if isinstance(module,__NormBase):
                 module.track_running_stats = True
         self.current_client.train_set_len = len(self.current_client.buffer_idx)
+
     def load_dataset(self):
         self.trainloader.sampler.set_index(self.current_client.buffer_idx)
         self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
+
     def start(self,
               client,
               optimizer_state_dict: OrderedDict[str, torch.Tensor],
@@ -160,6 +167,7 @@ class ODETrainer(FedAvgTrainer):
         self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0)
         torch.cuda.empty_cache()
         return self.current_client
+    
     def full_set(self):
         self.model.train()
         for _ in range(self.local_epoch):

@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 import torch
 import torchvision
 from os import path
+
 class BaseDataset(Dataset):
     def __init__(self) -> None:
         self.classes: List = None
@@ -26,6 +27,7 @@ class BaseDataset(Dataset):
         return data, targets
     def __len__(self):
         return len(self.targets)
+    
 class FEMNIST(BaseDataset):
     def __init__(
             self,
@@ -54,6 +56,7 @@ class FEMNIST(BaseDataset):
         self.general_target_transform = general_target_transform
         self.train_data_transform = train_data_transform
         self.train_target_transform = train_target_transform
+
 class CINIC10(datasets.ImageFolder):
     def __init__(
             self,
@@ -61,10 +64,14 @@ class CINIC10(datasets.ImageFolder):
             which: str
     ):
         super().__init__(root=f"{root}/{which}", transform=DATA_TRANSFORMS['cinic10'][which])
+
+
 class CIFAR100(torchvision.datasets.CIFAR100):
     def __init__(self, root, which):
         super().__init__(root=root, train=True if which == 'train' else False, download=True,
                          transform=DATA_TRANSFORMS['cifar100'][which])
+        
+
 GLOVE_NAME = "glove.840B.300d.txt"
 GLOVE_DIM = 300
 VOCAB_NAME = "vocab.pkl"
@@ -92,6 +99,7 @@ def read_snli(data_dir, is_train):
     hypotheses = [extract_text(row[2]) for row in rows if row[0] in label_set]
     labels = [label_set[row[0]] for row in rows if row[0] in label_set]
     return premises, hypotheses, labels
+
 class SNLIDataset(torch.utils.data.Dataset):
     def __init__(self, root, split):
         assert split in ["train", "test"]
@@ -143,8 +151,10 @@ class SNLIDataset(torch.utils.data.Dataset):
                 [word for word in sent.split() if word in self.word_vec] +
                 ["</s>"]
             )
+
     def __len__(self):
         return self.dataset_size
+    
     def __getitem__(self, idx):
         sent1 = self.s1_sentences[idx]
         sent2 = self.s2_sentences[idx]
@@ -158,9 +168,11 @@ class SNLIDataset(torch.utils.data.Dataset):
         s2_embed = torch.from_numpy(s2_embed).float()
         target = torch.tensor([self.targets[idx]]).long()
         return (s1_embed, s2_embed), target
+    
     @property
     def n_words(self):
         return len(self.word_vec)
+    
 def collate_pad_double(data_points):
     if type(data_points[0][0]) == tuple:
         s1_embeds = [x[0][0] for x in data_points]
@@ -202,6 +214,8 @@ def collate_pad_double(data_points):
         inputs = [torch.from_numpy(s1_embed).float(), torch.from_numpy(s1_lens), torch.from_numpy(s2_embed).float(), torch.from_numpy(s2_lens)]
         targets = torch.cat(targets)
         return index , (inputs, targets)
+    
+
 imgsize = 224
 def read_domainnet(dataset_path ,split ,selected_classes, selected_domain=["clipart","painting","sketch","real","quickdraw","infograph"]):
     data_paths = []
@@ -219,6 +233,8 @@ def read_domainnet(dataset_path ,split ,selected_classes, selected_domain=["clip
                 data_paths.append(data_path)
                 data_labels.append(int(label))
     return data_paths, data_labels
+
+
 class DomainNet(Dataset):
     def __init__(self, root , which, selected_classes = 150):
         super(DomainNet, self).__init__()
@@ -234,6 +250,8 @@ class DomainNet(Dataset):
         return img, label
     def __len__(self):
         return len(self.data_paths)
+    
+
 DATASETS: Dict[str, Type[BaseDataset]] = {
     "femnist": FEMNIST,
     "cinic10": CINIC10,
@@ -241,6 +259,7 @@ DATASETS: Dict[str, Type[BaseDataset]] = {
     "snli": SNLIDataset,
     "domainnet": DomainNet
 }
+
 DATA_NUM_CLASSES_DICT: Dict[str, int] = {
     "femnist": 62,
     "cinic10": 10,
@@ -248,18 +267,21 @@ DATA_NUM_CLASSES_DICT: Dict[str, int] = {
     "snli": 3,
     "domainnet": 150
 }
+
 DATASETS_COLLATE_FN ={
     "cinic10": None,
     "cifar100": None,
     "snli": collate_pad_double,
     "domainnet": None
 }
+
 DATASETS_SIZE = {
     "cinic10": (3, 32, 32),
     "cifar100": (3, 32, 32),
     "snli": (1,),
     "domainnet": (3, 224, 224)
 }
+
 DATA_TRANSFORMS = {
     "cinic10": {
         "train": transforms.Compose([

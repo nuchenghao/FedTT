@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 DATA_ROOT = Path(__file__).parent.parent.absolute()
+
 def prune_args(args: dict) -> Dict:
     args_dict = {}
     args_dict["dataset"] = args["dataset"]
@@ -30,6 +31,7 @@ def prune_args(args: dict) -> Dict:
             args_dict["alpha"] = args["alpha"]
             args_dict["least_samples"] = args["least_samples"]
     return args_dict
+
 def process_femnist():
     train_dir = DATA_ROOT / "femnist" / "data" / "train"
     test_dir = DATA_ROOT / "femnist" / "data" / "test"
@@ -138,6 +140,7 @@ def process_femnist():
         "total": client_cnt,
     }
     return partition, stats, client_cnt
+
 def process_celeba():
     train_dir = DATA_ROOT / "celeba" / "data" / "train"
     test_dir = DATA_ROOT / "celeba" / "data" / "test"
@@ -282,6 +285,7 @@ def process_celeba():
         "total": client_cnt,
     }
     return partition, stats, client_cnt
+
 def generate_synthetic_data(args):
     def softmax(x):
         ex = np.exp(x)

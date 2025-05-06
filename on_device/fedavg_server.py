@@ -41,6 +41,7 @@ server_lock = threading.RLock()
 write_finish = threading.Event()
 read_finish = threading.Event() 
 print_lock = multiprocessing.RLock()
+
 class Trainer:
     def __init__(self, args):
         self.args = args
@@ -61,10 +62,13 @@ class Trainer:
                                      persistent_workers=True, pin_memory_device=self.device,prefetch_factor = 8)
         self.client_model_cache = queue.Queue()
         self.weight_cache = queue.Queue()
+    
     def select_clients(self, global_epoch):
         self.current_selected_client_ids = self.client_sample_stream[global_epoch - 1]
+    
     def get_model_dict(self):
         return {key: value for key, value in self.model.state_dict().items()}
+    
     def aggregate(self):
         with torch.no_grad():
             client_model_cache = []
@@ -89,13 +93,17 @@ class Trainer:
             ]
             averaged_state_dict = OrderedDict(zip(client_model_cache[0].keys(), aggregated_model))
             self.model.load_state_dict(averaged_state_dict)
+
 def encode(obj):
     return pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+
 def decode(pickle_bytes, encoding='utf-8'):
     obj = pickle.loads(pickle_bytes, encoding=encoding)
     return obj
+
 def json_encode(obj, encoding):
     return json.dumps(obj, ensure_ascii=False).encode(encoding)
+
 def json_decode(json_bytes, encoding):
     tiow = io.TextIOWrapper(
         io.BytesIO(json_bytes), encoding=encoding, newline=""
@@ -103,6 +111,7 @@ def json_decode(json_bytes, encoding):
     obj = json.load(tiow)
     tiow.close()
     return obj
+
 class ReadThread(threading.Thread):
     def __init__(self, physical_device, keep):
         super().__init__()
@@ -112,6 +121,7 @@ class ReadThread(threading.Thread):
         self.print_lock = print_lock
         self.physical_device = physical_device
         self.keep = keep
+    
     def run(self):
         with multiprocessing.Manager() as manager:
             multiprocessing_shared_queue = manager.Queue()
@@ -145,6 +155,7 @@ class ReadThread(threading.Thread):
                 if server.wait_queue.qsize() == server.need_to_uploaded:
                     server.current_state = 'uploaded'
                     server.wait_queue.queue.clear()
+
 class ReadProcess(multiprocessing.Process):
     def __init__(self, physical_device, print_lock, multiprocessing_shared_queue , keep):
         super().__init__()
@@ -156,6 +167,7 @@ class ReadProcess(multiprocessing.Process):
         self.jsonheader = None
         self.client_2_server_data = None
         self.keep = keep
+    
     def _read(self):
         try:
             data = self.physical_device.sock.recv(20_971_520)
@@ -173,16 +185,19 @@ class ReadProcess(multiprocessing.Process):
                         console.log(f"Error: socket.close() exception for {self.physical_device.address}: {e!r}")
                     finally:
                         self.physical_device.sock = None
+    
     def process_protoheader(self):
         hdrlen = 2
         if len(self._recv_buffer) >= hdrlen:
             self._jsonheader_len = struct.unpack(">H", self._recv_buffer[:hdrlen])[0]
             self._recv_buffer = self._recv_buffer[hdrlen:]
+    
     def process_jsonheader(self):
         hdrlen = self._jsonheader_len
         if len(self._recv_buffer) >= hdrlen:
             self.jsonheader = json_decode(self._recv_buffer[:hdrlen], "utf-8")
             self._recv_buffer = self._recv_buffer[hdrlen:]
+    
     def process_request(self):
         content_len = self.jsonheader["content-length"]
         if not len(self._recv_buffer) == content_len:
@@ -208,6 +223,7 @@ class ReadProcess(multiprocessing.Process):
             with self.print_lock:
                 console.log(f"Received {name}'s {client_id} upload info and transmission time is {client_2_server_time}", style="bold yellow")
             self.multiprocessing_shared_queue.put(('upload', self.physical_device.physical_device_id, self.client_2_server_data))
+    
     def run(self):
         while True:
             self._read()
@@ -228,6 +244,7 @@ class ReadProcess(multiprocessing.Process):
                 console.log(f"Error: socket.close() exception for {self.physical_device.address}: {e!r}")
             finally:
                 self.physical_device.sock = None
+
 class WriteThread(threading.Thread):
     def __init__(self,content_server_2_client, physical_device):
         super().__init__()
@@ -238,6 +255,7 @@ class WriteThread(threading.Thread):
         self.physical_device = physical_device
         self.content_server_2_client = content_server_2_client
         self.multiprocessing_shared_queue = multiprocessing.Queue()
+    
     def run(self):
         write_process = WriteProcess(self.content_server_2_client, self.physical_device, self.print_lock, self.multiprocessing_shared_queue)
         write_process.start()
@@ -252,6 +270,7 @@ class WriteThread(threading.Thread):
                     server.current_state = 'distributed' 
                     server.wait_queue.queue.clear()
                     write_finish.set()
+
 class WriteProcess(multiprocessing.Process):
     def __init__(self, content_server_2_client, physical_device, print_lock, multiprocessing_shared_queue):
         super().__init__()
@@ -260,6 +279,7 @@ class WriteProcess(multiprocessing.Process):
         self.print_lock = print_lock
         self.multiprocessing_shared_queue = multiprocessing_shared_queue
         self._send_buffer = b""
+    
     def _create_message(
             self, content
     ):
@@ -270,10 +290,12 @@ class WriteProcess(multiprocessing.Process):
         message_hdr = struct.pack(">H", len(jsonheader_bytes))
         message = message_hdr + jsonheader_bytes + content
         return message
+    
     def _create_response(self):
         response = dict(timestamp = time.time(), content = self.content_server_2_client)
         response = encode(response)
         return response
+    
     def run(self):
         with self.print_lock:
             console.log(f"start sending to {self.physical_device.name} whose physical device id is {self.physical_device.physical_device_id}")
@@ -293,6 +315,7 @@ class WriteProcess(multiprocessing.Process):
         self.multiprocessing_shared_queue.put(("distribute", self.physical_device.physical_device_id))
         with self.print_lock:
             console.log(f"Sent to {self.physical_device.name} whose physical device id is {self.physical_device.physical_device_id}")
+
 class Server:
     def __init__(self,args, socket_manager):
         self.args = args
@@ -325,14 +348,17 @@ class Server:
                 reinit=True,
             )
             self.experiment.log({"acc": 0.0}, step=0)            
+    
     def add_device(self):
         self.current_device_nums += 1
+    
     def close_all_sockets(self):
         for physical_device in self.all_physical_device_queue:
             self.socket_manager.sel.unregister(physical_device.sock)
             physical_device.close()
         self.socket_manager.sel.unregister(self.socket_manager.lsock)
         self.socket_manager.sel.close()
+
 class physicalDevice:
     def __init__(self, sock, physical_device_id, addr):
         self.sock = sock
@@ -340,8 +366,10 @@ class physicalDevice:
         self.name = ""
         self.address = addr
         self.client_ids = []
+    
     def __repr__(self):
         return f"\n{self.name}'s message id is {self.physical_device_id}"
+    
     def close(self):
         console.log(f"Closing connection to {self.address}")
         try:
@@ -362,12 +390,14 @@ class serversocket():
         console.log(f"Listening on {(self.server_ip, self.server_port)}", style="bold white on blue")
         self.lsock.setblocking(False)
         self.sel.register(self.lsock, selectors.EVENT_READ, data=None)
+    
     def accept_wrapper(self, sock, physical_device_id = -1):
         conn, addr = sock.accept()
         conn.setblocking(False)
         physical_device = physicalDevice(conn, physical_device_id, addr)
         self.sel.register(conn, selectors.EVENT_READ, data=physical_device)
         return physical_device
+
 def split_list_to_clients(lst, num_clients):
     shuffled = copy.deepcopy(lst)
     random.shuffle(shuffled)
@@ -382,6 +412,7 @@ def split_list_to_clients(lst, num_clients):
         start = end
     divided.append(shuffled[start:])
     return divided
+
 def split_numbers():
     numbers = list(range(30))
     random.shuffle(numbers)
@@ -390,6 +421,7 @@ def split_numbers():
         numbers[12:24],
         numbers[24:]
     ]
+
 def registerStage():
     global server
     while True:
@@ -443,6 +475,7 @@ def registerStage():
             if server.current_state == "checked":
                 console.log("received all checked info", style="red")
                 break
+
 def trainingstage():
     global server
     for global_epoch in range(1,server.total_epoches + 1):
@@ -506,6 +539,7 @@ def trainingstage():
         write_thread.start()
     write_finish.wait()
     write_finish.clear()
+
 if __name__ == '__main__':
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

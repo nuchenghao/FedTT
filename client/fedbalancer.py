@@ -21,6 +21,7 @@ compute_heterogeneity = [1.0, 1.46, 1.89, 2.0]
 probability = [0.45, 0.25, 0.2, 0.1]
 with open(PROJECT_DIR / "utls" / "network_distribution.json", 'r') as f:
     network_distribution = json.load(f)
+
 class fedbalancerClient(BaseClient):
     def __init__(self, client_id, train_index, batch_size):
         super().__init__(client_id, train_index, batch_size)
@@ -28,11 +29,13 @@ class fedbalancerClient(BaseClient):
         self.len_OT = self.train_set_len
         self.selected_data_index = None
         self.metadata = {}
+
 class fedbalancerTrainer(FedAvgTrainer):
     def __init__(self, device, model, trainloader, testloader, args):
         super().__init__(device, model, trainloader, testloader, args)
         self.p = 1
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
+
     def load_dataset(self):
         S = int(max(self.synchronization['deadline'] / self.local_epoch / self.current_client.batch_training_time,1.0) * self.current_client.batch_size)
         if self.current_client.participation_times == 0 or S >= self.current_client.train_set_len:
@@ -54,6 +57,7 @@ class fedbalancerTrainer(FedAvgTrainer):
             self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
             self.current_client.selected_data_index = selected_index
             self.current_client.len_OT = len(over_threshold)
+
     def start(self,
               client,
               optimizer_state_dict: OrderedDict[str, torch.Tensor],
@@ -83,6 +87,7 @@ class fedbalancerTrainer(FedAvgTrainer):
         self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0)
         torch.cuda.empty_cache()
         return self.current_client
+    
     def full_set(self):
         self.model.train()
         for _ in range(self.local_epoch):

@@ -1,32 +1,33 @@
 algorithm: fedcase
-model: resnet50 
 dataset: cifar100 
+model: resnet50 
 
 
 set_seed: True 
 seed: 166666 
 
 client_num: 30 
+
+batch_size: 256 # trainloader batch size
+t_batch_size: 2048 # testloader batch size
+
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 1200
-local_epoch: 1
-batch_size: 256 # Data batch size for client local training.
-t_batch_size: 2048
-client_eval: False
+global_epoch: 300
+local_epoch: 4
 
-
+# parameter for torch.optim.SGD
 lr: 0.01 # Learning rate for client local training.
 momentum: 0.0 # Momentum for client local opitimizer.
 weight_decay: 0.0 # Weight decay for client local optimizer.
 
-# record
+# wandb setting
+wandb: 1 # wandb: 1 record, 0 not
+project: cifar100_166666
+experiment_name: fedcase_256
+
+R_S: 0.9 # parameter for fedcase
+alpha: 0.0 # parameter for fedcase
+
+client_eval: False # Whether to perform testing on the client side.
 save_log: 1 # Non-zero value for saving algorithm running log 
-
-# wandb记录
-wandb: 1
-project: "cifar100_166666"
-experiment_name: "fedcase_256"
-
-R_S: 0.9
-alpha: 0.0
 device: "cuda:0"

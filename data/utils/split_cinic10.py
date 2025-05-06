@@ -6,6 +6,7 @@ import torchvision.transforms as transforms
 import os
 from collections import defaultdict
 from torchvision.datasets import ImageFolder
+
 def split_cinic10(root_dir, new_test_size=40000):
     id=0
     transform = transforms.Compose([transforms.ToTensor()])
@@ -40,6 +41,7 @@ def split_cinic10(root_dir, new_test_size=40000):
             id+=1
         test_files=[]
     print(id)
+    
 if __name__ == "__main__":
     root_dir = "../cinic10/raw"
     split_cinic10(root_dir)

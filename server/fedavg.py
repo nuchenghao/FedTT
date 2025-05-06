@@ -31,6 +31,7 @@ from client.fedavg import FedAvgTrainer, BaseClient
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
 from utls.dataset import CustomSampler
+
 class FedAvgServer:
     def __init__(
             self,
@@ -112,6 +113,7 @@ class FedAvgServer:
         self.cuda_0_trainer = trainer_type(self.device, deepcopy(self.model), self.trainloader, self.testloader,
                                            self.args)
         self.logger.log(f"{self.device} has been initialized")
+    
     def train(self):
         for E in range(self.args["global_epoch"]):
             self.logger.log("-" * 30, f"[bold red]TRAINING EPOCH: {E + 1}[/bold red]", "-" * 30)
@@ -127,6 +129,7 @@ class FedAvgServer:
                 self.experiment.log({"acc": self.accuracy}, step=self.current_time)
         for client_instance in self.client_instances:
             self.logger.log(f"Client{client_instance.client_id}'s training time : {client_instance.training_time_record}")
+    
     def train_one_round(self,global_round):
         client_model_cache = []
         weight_cache = []
@@ -159,6 +162,7 @@ class FedAvgServer:
             self.client_instances[modified_client_instance.client_id] = modified_client_instance
         self.aggregate(client_model_cache, weight_cache)
         return max(client_training_time)
+    
     def aggregate(
             self,
             client_model_cache,
@@ -173,6 +177,7 @@ class FedAvgServer:
             ]
             averaged_state_dict = OrderedDict(zip(client_model_cache[0].keys(), aggregated_model))
             self.model.load_state_dict(averaged_state_dict)
+            
 if __name__ == "__main__":
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

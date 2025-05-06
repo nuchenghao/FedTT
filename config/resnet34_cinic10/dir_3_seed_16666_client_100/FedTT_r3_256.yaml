@@ -1,22 +1,36 @@
 algorithm: FedTT
-batch_size: 256
-client_eval: false
-client_join_ratio: 0.3
-client_num: 100
 dataset: cinic10
-device: cuda:0
-experiment_name: FedTT_r3_256
+model: resnet34
+
+set_seed: true
+seed: 16666
+
+
+client_num: 100
+
+batch_size: 256 # trainloader batch size
+t_batch_size: 2048 # testloader batch size
+
+client_join_ratio: 0.3 # Each time, client_join_ratio * client_num clients are selected to participate in training.
 global_epoch: 300
 local_epoch: 4
+
+# parameter for torch.optim.SGD
 lr: 0.01
-max_gpu_memory_GB: 22
-model: resnet34
 momentum: 0.0
-project: cinic10_16666
-r: 0.3
-save_log: 1
-seed: 16666
-set_seed: true
-t_batch_size: 2048
-wandb: 1
 weight_decay: 0.0
+
+
+# wandb setting
+wandb: 1 # wandb: 1 record, 0 not
+project: cinic10_16666
+experiment_name: FedTT_r3_256
+
+r: 0.3 # retention rate
+
+max_gpu_memory_GB: 22
+
+client_eval: false # Whether to perform testing on the client side.
+save_log: 1 # Store output logs locally.
+device: cuda:0
+

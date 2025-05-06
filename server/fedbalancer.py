@@ -29,6 +29,7 @@ from client.fedbalancer import fedbalancerClient,fedbalancerTrainer
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS_COLLATE_FN
 from utls.dataset import NeedIndexDataset
+
 class fedbalancer(FedAvgServer):
     def __init__(self, args = None, trainer_type=fedbalancerTrainer, client_type=fedbalancerClient):
         super().__init__(args, trainer_type, client_type)
@@ -51,6 +52,7 @@ class fedbalancer(FedAvgServer):
         self.w = 5
         self.lss =0.05
         self.dss = 0.05
+    
     def batch_training_time(self):
         model = MODEL_DICT[self.args["model"]](DATA_NUM_CLASSES_DICT[self.args['dataset']]).to(self.device)
         model.train()
@@ -79,10 +81,12 @@ class fedbalancer(FedAvgServer):
             torch.cuda.synchronize()
             train_time.append(start.elapsed_time(end)/len(self.trainloader)/1000.0)
         return sum(train_time) / len(train_time)
+    
     def lt_selection_next_round(self,LLow,LHigh):
         ll = min(LLow)
         lh = sum(LHigh) / len(LHigh)
         self.lt = ll + (lh - ll) * self.ltr
+    
     def ltr_ddlr_control(self,LSum_R,L_R):
         self.U.append( LSum_R / (L_R * self.ddl_R))
         if self.current_global_epoch % self.w == 0 :
@@ -92,6 +96,7 @@ class fedbalancer(FedAvgServer):
             else:
                 self.ltr = max(self.ltr - self.lss , 0.0)
                 self.ddlr = min(self.ddlr + self.dss , 1.0)
+    
     def select_deadline(self,E):
         def find_peak_ddl_E(epoch):
             completeTime = []
@@ -111,6 +116,7 @@ class fedbalancer(FedAvgServer):
         dl = find_peak_ddl_E(1)
         dh = find_peak_ddl_E(E)
         self.ddl_R = dl + (dh - dl) * self.ddlr
+    
     def train_one_round(self,global_round):
         client_model_cache = []
         weight_cache = []
@@ -155,6 +161,7 @@ class fedbalancer(FedAvgServer):
         self.lt_selection_next_round(LLow,LHigh)
         self.ltr_ddlr_control(sum(Lsum),L_R)
         return max(client_training_time)
+    
 if __name__ == "__main__":
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

@@ -2,6 +2,7 @@ from collections import Counter
 from typing import Dict, List, Tuple
 import numpy as np
 from torch.utils.data import Dataset
+
 def dirichlet(
         dataset: Dataset, client_num: int, alpha: float, least_samples: int
 ) -> Tuple[List[List[int]], Dict]:

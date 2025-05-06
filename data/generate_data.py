@@ -12,6 +12,7 @@ sys.path.append(FL_BENCH_ROOT.as_posix())
 from data.draw_data_distribution import draw_data_distribution
 from utls.utils import get_argparser, fix_random_seed
 from data.utils.datasets import DATASETS, DATA_NUM_CLASSES_DICT
+
 from data.utils.schemes import (
     dirichlet,
     iid_partition,
@@ -19,12 +20,14 @@ from data.utils.schemes import (
     allocate_shards,
     semantic_partition,
 )
+
 from data.utils.process import (
     prune_args,
     generate_synthetic_data,
     process_celeba,
     process_femnist,
 )
+
 def main(args: dict, which: str):
     dataset_root = CURRENT_DIR / args["dataset"]
     if which == 'test':
@@ -59,9 +62,11 @@ def main(args: dict, which: str):
         json.dump(stats, f)
     with open(dataset_root / "args.json", "w") as f:
         json.dump(prune_args(args), f)
+
 def generate_data(args: dict):
     main(args, "train")
     main(args, "test")
+    
 if __name__ == "__main__":
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

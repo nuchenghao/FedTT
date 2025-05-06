@@ -15,7 +15,7 @@ wandb: 1 # wandb: 1 record, 0 not
 project: cifar100_166
 experiment_name: centralized training
 
-# optimizer
+# parameter for torch.optim.SGD
 lr: 0.01
 momentum: 0.0
 weight_decay: 0.0

@@ -1,33 +1,35 @@
 algorithm: FedTT_wo_gc
-model: resnet50 
 dataset: cifar100 
+model: resnet50 
 
 
 set_seed: True 
 seed: 16 
 
 client_num: 30 
+
+batch_size: 96 # trainloader batch size
+t_batch_size: 2048 # testloader batch size
+
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
 global_epoch: 300
 local_epoch: 4
-batch_size: 96 # Data batch size for client local training.
-t_batch_size: 2048
-client_eval: False
 
+# parameter for torch.optim.SGD
 lr: 0.01 # Learning rate for client local training.
 momentum: 0.0 # Momentum for client local opitimizer.
 weight_decay: 0.0 # Weight decay for client local optimizer.
 
-# record
-save_log: 1 # Non-zero value for saving algorithm running log
 
-# wandb record
-wandb: 1
-project: "cifar100_16"
-experiment_name: "FedTT_wo_gc_r3"
+# wandb setting
+wandb: 1 # wandb: 1 record, 0 not
+project: cifar100_16
+experiment_name: FedTT_wo_gc_r3
 
 
-r: 0.3
-start: 0.0
+r: 0.3 # retention rate
 max_gpu_memory_GB: 22
+
+client_eval: False # Whether to perform testing on the client side.
+save_log: 1 # Non-zero value for saving algorithm running log
 device: "cuda:0"

@@ -13,6 +13,7 @@ import copy
 from collections import Counter
 from utls.utils import  evaluate
 from utls.utils import Timer
+
 class BaseClient:
     def __init__(self, client_id, train_index, batch_size):
         self.client_id = client_id
@@ -28,8 +29,10 @@ class BaseClient:
         self.grad = None
         self.buffer = None
         self.training_time_record = {}
+
     def participate_once(self):
         self.participation_times += 1
+
 class FedAvgTrainer:
     def __init__(
             self,
@@ -57,13 +60,16 @@ class FedAvgTrainer:
         )
         self.timer = Timer()  
         self.synchronization = {}
+
     def load_dataset(self):
         self.trainloader.sampler.set_index(self.current_client.train_set_index)
         self.trainloader.batch_sampler.batch_size = self.current_client.batch_size
+
     def set_parameters(self, optimizer_state_dict, trainer_synchronization):
         self.optimizer.load_state_dict(optimizer_state_dict)
         self.model.load_state_dict(self.current_client.model_dict)
         self.synchronization = trainer_synchronization
+
     def start(self,
               client,
               optimizer_state_dict: OrderedDict[str, torch.Tensor],
@@ -89,6 +95,7 @@ class FedAvgTrainer:
         self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0)
         torch.cuda.empty_cache()
         return self.current_client
+    
     def full_set(self):
         self.model.train()
         for _ in range(self.local_epoch):
@@ -104,5 +111,6 @@ class FedAvgTrainer:
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
+        
     def local_train(self):
         self.full_set()

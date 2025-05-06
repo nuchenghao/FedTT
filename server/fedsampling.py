@@ -16,6 +16,7 @@ def calculate_alpha(M: int , epsilon: float = 3) -> float:
     numerator = exp_epsilon - 1
     denominator = exp_epsilon + M - 2
     return numerator / denominator
+
 class fedsampling(FedAvgServer):
     def __init__(self, args, trainer_type=fedsamplingTrainer, client_type=fedsamplingClient):
         super().__init__(args, trainer_type, client_type)
@@ -26,6 +27,7 @@ class fedsampling(FedAvgServer):
         for client_instance in self.client_instances:
             assert type(client_instance) == fedsamplingClient
             client_instance.set_estimator(self.M , self.alpha)
+    
     def train_one_round(self,global_round):
         client_grad = []
         client_buffer = []
@@ -74,6 +76,7 @@ class fedsampling(FedAvgServer):
             agg_buffer =(1 / self.K) * torch.sum(torch.stack(cache,dim=-1) , dim=-1)
             param.data = agg_buffer
         return max(client_training_time)
+    
 if __name__ == '__main__':
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

@@ -9,6 +9,7 @@ from data.utils.datasets import DATASETS_SIZE
 nvml.nvmlInit()
 import random
 import math
+
 class FedTTClient(FedAvgTrainer):
     def __init__(self,
                  device,
@@ -42,6 +43,7 @@ class FedTTClient(FedAvgTrainer):
         }
         nvml.nvmlInit()
         self.handle = nvml.nvmlDeviceGetHandleByIndex(0) 
+
     def full_set(self):
         self.model.train()
         for _ in range(self.local_epoch):
@@ -57,6 +59,7 @@ class FedTTClient(FedAvgTrainer):
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
+        
     def train(self):
         cnt = 1
         while True:

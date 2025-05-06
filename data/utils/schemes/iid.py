@@ -3,6 +3,7 @@ from collections import Counter
 from typing import Dict, List, Tuple
 import numpy as np
 from torch.utils.data import Dataset
+
 def iid_partition(dataset: Dataset, client_num: int) -> Tuple[List[List[int]], Dict]:
     partition = {"separation": None, "data_indices": None}
     stats = {}

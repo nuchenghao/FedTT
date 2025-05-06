@@ -40,6 +40,8 @@ client_lock = threading.RLock()
 read_finish = threading.Event()
 write_finish = threading.Event()
 print_lock = multiprocessing.RLock()
+
+
 class BaseClient:
     def __init__(self, client_id, train_index, batch_size):
         self.client_id = client_id
@@ -54,10 +56,13 @@ class BaseClient:
         self.grad = None
         self.buffer = None
         self.training_time_record = {}
+
     def participate_once(self):
         self.participation_times += 1
+
     def neet_to_send(self):
         return {}
+    
 class Trainer:
     def __init__(
             self,
@@ -76,13 +81,16 @@ class Trainer:
         self.criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(self.device)
         self.optimizer = None
         self.timer = Timer()
+
     def load_dataset(self):
         self.trainloader.sampler.set_index(self.current_client_instance.train_set_index)
         self.trainloader.batch_sampler.batch_size = self.current_client_instance.batch_size
+
     def set_parameters(self,model_parameters):
         self.model.load_state_dict(model_parameters)
         self.model = self.model.to(self.device)
         self.optimizer = torch.optim.SGD(params=self.model.parameters(),lr=self.args["lr"],momentum=self.args["momentum"],weight_decay=self.args["weight_decay"],)
+
     def start(self,global_epoch, client_instance, model_parameters):
         self.timer.start()
         self.current_client_instance = client_instance
@@ -95,6 +103,7 @@ class Trainer:
         self.current_client_instance.training_time_record[global_epoch] = self.timer.times[-1]
         self.current_client_instance.participate_once()
         return current_client_instance_model_dict, self.current_client_instance.training_time_record[global_epoch]
+    
     def full_set(self):
         self.model.train()
         for _ in range(self.local_epoch):
@@ -110,20 +119,26 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
+
     def local_train(self):
         self.full_set()
+
 def encode(obj):
     return pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+
 def decode(pickle_bytes, encoding='utf-8'):
     obj = pickle.loads(pickle_bytes, encoding=encoding)
     return obj
+
 def json_encode(obj, encoding):
     return json.dumps(obj, ensure_ascii=False).encode(encoding)
+
 def json_decode(json_bytes, encoding):
     tiow = io.TextIOWrapper(io.BytesIO(json_bytes), encoding=encoding, newline="")
     obj = json.load(tiow)
     tiow.close()
     return obj
+
 class ReadThread(threading.Thread):
     def __init__(self):
         super().__init__()
@@ -135,6 +150,7 @@ class ReadThread(threading.Thread):
         self.jsonheader = None
         self.server_2_client_data = None
         self.finishedRead = False
+
     def _read(self):
         try:
             data = self.client.socket_manager.sock.recv(20_971_520)
@@ -145,6 +161,7 @@ class ReadThread(threading.Thread):
                 self._recv_buffer += data
             else:
                 raise RuntimeError("Peer closed.")
+            
     def process_jsonheader(self):
         hdrlen = self._jsonheader_len
         if len(self._recv_buffer) >= hdrlen:
@@ -152,11 +169,13 @@ class ReadThread(threading.Thread):
                 self._recv_buffer[:hdrlen], "utf-8"
             )
             self._recv_buffer = self._recv_buffer[hdrlen:]
+    
     def process_protoheader(self):
         hdrlen = 2
         if len(self._recv_buffer) >= hdrlen:
             self._jsonheader_len = struct.unpack(">H", self._recv_buffer[:hdrlen])[0]
             self._recv_buffer = self._recv_buffer[hdrlen:]
+    
     def process_response(self):
         content_len = self.jsonheader["content-length"]
         if not len(self._recv_buffer) == content_len:
@@ -169,6 +188,7 @@ class ReadThread(threading.Thread):
         with self.client_lock:
             self.client.received_data = self.server_2_client_data
         self.finishedRead = True
+    
     def run(self):
         while True:
             self._read()
@@ -182,6 +202,7 @@ class ReadThread(threading.Thread):
                     self.process_response()
                 else:
                     break
+
 class MyThread(threading.Thread):
     def __init__(self,):
         super().__init__()
@@ -190,6 +211,7 @@ class MyThread(threading.Thread):
         self.client_lock = client_lock
         self.print_lock = print_lock
         self.daemon = True
+    
     def run(self):
         while True:
             need_to_send = self.client.need_to_send_queue.get()
@@ -200,6 +222,7 @@ class MyThread(threading.Thread):
                 self.client.need_to_send_num -= 1
                 if self.client.need_to_send_num == 0:
                     write_finish.set()
+
 class WriteProcess(multiprocessing.Process):
     def __init__(self, server_ip_port, need_to_send, print_lock):
         super().__init__()
@@ -209,6 +232,7 @@ class WriteProcess(multiprocessing.Process):
         self.sock.connect_ex(server_ip_port)
         self.print_lock = print_lock
         self._send_buffer = b""
+    
     def _create_message(
             self, content
     ):
@@ -219,10 +243,12 @@ class WriteProcess(multiprocessing.Process):
         message_hdr = struct.pack(">H", len(jsonheader_bytes))
         message = message_hdr + jsonheader_bytes + content
         return message
+    
     def _create_response(self):
         response = dict(timestamp = time.time(), content = self.need_to_send)
         response = encode(response)
         return response
+    
     def run(self):
         with self.print_lock:
             console.log(f"start sending to server")
@@ -248,6 +274,7 @@ class WriteProcess(multiprocessing.Process):
                 console.log(f"Error: socket.close() exception: {e!r}")
         finally:
             self.sock = None
+
 class clientsocket:
     def __init__(self, server_ip, server_port, name):
         self.server_ip = server_ip
@@ -256,6 +283,7 @@ class clientsocket:
         self.sock.setblocking(False)
         self.sock.connect_ex((self.server_ip,self.server_port))
         self.need_to_send = {"name": name,"action":"register"}
+    
     def _create_message(
             self, content
     ):
@@ -266,10 +294,12 @@ class clientsocket:
         message_hdr = struct.pack(">H", len(jsonheader_bytes))
         message = message_hdr + jsonheader_bytes + content
         return message
+    
     def _create_response(self):
         response = dict(timestamp = time.time(), content = self.need_to_send)
         response = encode(response)
         return response
+    
     def send(self):
         console.log(f"start registering to server")
         response = self._create_response()
@@ -287,6 +317,7 @@ class clientsocket:
             else:
                 break
         console.log(f"send to server successfully")
+    
     def close(self):
         print(f"Closing connection to {self.server_ip}")
         try:
@@ -295,6 +326,7 @@ class clientsocket:
             print(f"Error: socket.close() exception for {self.addr}: {e!r}")
         finally:
             self.sock = None
+
 class Client:
     def __init__(self, args, socket_manager, name):
         self.args = args
@@ -311,10 +343,12 @@ class Client:
         self.current_epoch_transmission = 0
         self.current_selected_client_ids = []
         self.model = None
+
 def read_from_server():
     read_thread = ReadThread()
     read_thread.start()
     read_thread.join()
+
 def run():
     global client, client_lock
     client.socket_manager.send()
@@ -361,6 +395,7 @@ def run():
         console.log(f"{client.name} has finished local training of all selected clients")
         write_finish.wait()
         write_finish.clear()
+
 if __name__ == '__main__':
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

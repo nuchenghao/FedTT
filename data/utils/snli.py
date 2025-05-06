@@ -3,10 +3,12 @@ from math import ceil
 import pickle
 import re
 import numpy as np
+
 GLOVE_NAME = "glove.840B.300d.txt"
 GLOVE_DIM = 300
 VOCAB_NAME = "vocab.pkl"
 WORDVEC_NAME = "wordvec.pkl"
+
 def read_snli(data_dir, is_train):
     def extract_text(s):
         s = re.sub('\\(', '', s)
@@ -30,6 +32,7 @@ def read_snli(data_dir, is_train):
     hypotheses = [extract_text(row[2]) for row in rows if row[0] in label_set]
     labels = [label_set[row[0]] for row in rows if row[0] in label_set]
     return premises, hypotheses, labels
+
 def construct_vocab_and_word2vec(all_data_root):
     print("========= start constructing vocab ================")
     vocab = ["<s>", "</s>"]

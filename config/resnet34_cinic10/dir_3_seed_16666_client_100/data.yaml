@@ -1,7 +1,11 @@
-alpha: 0.3
-client_num: 100
 dataset: cinic10
-device: cuda:0
-iid: 0
-least_samples: 100
 seed: 16666
+
+client_num: 100
+
+
+iid: 0 # 0: non-iid, others: iid
+alpha: 0.3 #if non-iid, Dirichlet distribution
+
+least_samples: 100 # Each client has at least least_samples samples.
+device: cuda:0

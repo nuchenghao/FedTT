@@ -1,6 +1,6 @@
 algorithm: ODE
-model: biRNN 
 dataset: snli 
+model: biRNN 
 
 
 set_seed: True 
@@ -8,24 +8,27 @@ seed: 1666
 
 client_num: 100
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
-global_epoch: 200
-local_epoch: 4
-batch_size: 256 # Data batch size for client local training.
-t_batch_size: 2048
-client_eval: False
 
+global_epoch: 300
+local_epoch: 4
+
+batch_size: 256 # trainloader batch size
+t_batch_size: 2048 # testloader batch size
+
+# parameter for torch.optim.SGD
 lr: 0.01 # Learning rate for client local training.
 momentum: 0.0 # Momentum for client local opitimizer.
 weight_decay: 0.0 # Weight decay for client local optimizer.
 
-# record
-save_log: 1 # Non-zero value for saving algorithm running log 
 
 # wandb record
-wandb: 1
-project: "snli_1666"
-experiment_name: "ODE"
+wandb: 1 # wandb: 1 record, 0 not
+project: snli_1666
+experiment_name: ODE
 
-labels_per_client: 1.0
-update_batch_size: 64
+labels_per_client: 1.0 # parameter for ode
+update_batch_size: 64 # parameter for ode
+
+client_eval: False # Whether to perform testing on the client side.
+save_log: 1 # Non-zero value for saving algorithm running log 
 device: "cuda:0"

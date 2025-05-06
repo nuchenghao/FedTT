@@ -34,6 +34,7 @@ from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLA
 from utls.dataset import CustomSampler
 from server.fedavg import FedAvgServer
 from client.fednova import FedNovaTrainer,FedNovaClient
+
 class FedNovaServer(FedAvgServer):
     def __init__(self, args = None, trainer_type=FedNovaTrainer, client_type=FedNovaClient):
         super().__init__(args, trainer_type, client_type)
@@ -59,6 +60,7 @@ class FedNovaServer(FedAvgServer):
         for key in model_state:
             model_state[key] = model_state[key] - coeff * nova_model_state[key]
         self.model.load_state_dict(model_state)
+        
 if __name__ == "__main__":
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

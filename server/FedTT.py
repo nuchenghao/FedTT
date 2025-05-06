@@ -54,6 +54,7 @@ class FedTTServer(FedAvgServer):
         self.aggregate(client_model_cache, weight_cache)
         self.current_global_epoch += 1
         return max(client_training_time)
+    
 if __name__ == '__main__':
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:

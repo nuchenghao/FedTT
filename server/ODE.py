@@ -33,6 +33,7 @@ from server.fedavg import FedAvgServer
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATASETS_COLLATE_FN
 from utls.dataset import NeedIndexDataset
+
 class ODEServer(FedAvgServer):
     def __init__(self, args = None, trainer_type=ODETrainer, client_type=ODEClient):
         super().__init__(args, trainer_type, client_type)
@@ -55,6 +56,7 @@ class ODEServer(FedAvgServer):
         self.coordinate()
         self.init_client_buffer()
         self.global_gradient:list[torch.tensor] = None
+
     def set_client_label(self):
         for client_instance in self.client_instances:
             label = []
@@ -66,6 +68,7 @@ class ODEServer(FedAvgServer):
             assert len(client_instance.label_num_distribution.keys()) == len(np.unique(client_instance.train_set_label))
             for lable_ in client_instance.label_num_distribution.keys():
                 assert client_instance.label_num_distribution[lable_] == len(np.where(client_instance.train_set_label == int(lable_))[0])
+    
     def coordinate(self):
         info_classes = {i:[] for i in range(self.data_num_classes)}
         size_classes = {i:0 for i in range(self.data_num_classes)}
@@ -116,6 +119,7 @@ class ODEServer(FedAvgServer):
             client_instance.weights_tensor = torch.zeros(self.data_num_classes,dtype=torch.float32,device=self.device)
             for label,value in client_instance.label_weight.items():
                 client_instance.weights_tensor[label] = value
+    
     def init_client_buffer(self):
         self.logger.log("===============start initializing client buffer================")
         for client_instance in tqdm(self.client_instances):
@@ -130,6 +134,7 @@ class ODEServer(FedAvgServer):
             for label in client_instance.label_weight.keys():
                 new_num_train_samples += client_instance.label_weight[label] * client_instance.buffer_size[label]
             client_instance.new_weight4aggregation = new_num_train_samples
+    
     def calculate_global_grad(self):
         self.logger.log("===============start calculating global grad================")
         for client_instance in self.client_instances:
@@ -144,6 +149,7 @@ class ODEServer(FedAvgServer):
                 self.global_gradient = [torch.sum(torch.stack(_grad,dim=-1),dim=-1) for _grad in zip(self.global_gradient,client_grad)]
             del client_grad
             cnt += 1
+    
     def update_client_buffer(self):
         for client_id in tqdm(self.current_selected_client_ids):
             self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict())
@@ -151,6 +157,7 @@ class ODEServer(FedAvgServer):
             del self.client_instances[client_id].model_dict
         del self.global_gradient
         torch.cuda.empty_cache()
+    
     def train_one_round(self,global_round):
         self.calculate_global_grad()
         self.update_client_buffer()
@@ -183,6 +190,7 @@ class ODEServer(FedAvgServer):
             self.client_instances[modified_client_instance.client_id] = modified_client_instance
         self.aggregate(client_model_cache, weight_cache)
         return max(client_training_time)
+    
 if __name__ == "__main__":
     parser = get_argparser().parse_args()
     with open(parser.config_path, 'r') as file:
