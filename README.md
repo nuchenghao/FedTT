@@ -9,11 +9,42 @@ Repertory for *It Takes Two: Accelerating Accurate Federated Learning through Pi
 # The software configuration of the workstation is as follows:
 + System: Ubuntu 20.04.6 LTS
 + NVIDIA Driver Version: 550.135
-+ CUDA Version: 12.1
++ CUDA Driver Version: 12.1
 + Pytorch: 2.5.1
-+ Python: 3.12.7
++ Python3: 3.12.7
 
 # Run FedTT
-+ All simulation startup commands are stored in start.sh
-+ All testbed experiment startup commands are stored in start_on_device.sh
++ All simulation startup commands are stored in `start.sh`
++ All testbed experiment startup commands are stored in `start_on_device.sh`
++ **Before running all FL experiments, make sure to execute the data generation commands. These commands are also included in the script file.**
+
+## cifar-100
+The dataset is stored in the `FedTT/data/cifar100` directory.
+
+## cinic-10
+For the cinic-10 dataset, we merge its `train` and `valid` sets to obtain a larger training set, which is then partitioned across different clients.
+
+1. Put the `CINIC-10.tar.gz` file into the `FedTT/data/cinic10/raw` directory.
+2. Execute the following commands:
+
+```bash
+cd ./data/cinic10/raw
+tar -zxvf CINIC-10.tar.gz
+cd ../../utils
+python3 split_cinic10.py
+```
+
+## snli
+1. Download the [SNLI 1.0](https://nlp.stanford.edu/projects/snli/) and [glove.840B.300d.zip](https://nlp.stanford.edu/projects/glove/) to the `FedTT/data/snli` directory.
+2. Execute the following commands:
+
+```bash
+cd ./data/snli
+unzip snli.zip -d . && mv ./snli_1.0/* . && rm -rf snli_1.0
+cd ../utils
+python3 snli.py
+```
+
+## domainnet
+Download these six [sub-datasets](https://ai.bu.edu/M3SDA/) to the `FedTT/data/domainnet`, unzip these, and put the `.txt`s to the `FedTT/data/domainnet/splits`.
 
