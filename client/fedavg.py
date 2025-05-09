@@ -17,7 +17,7 @@ from utls.utils import Timer
 class BaseClient:
     def __init__(self, client_id, train_index, batch_size):
         self.client_id = client_id
-        self.train_set_index = np.array(train_index)
+        self.train_set_index = np.array(train_index) # The indices of the data owned by this client
         self.train_set_len = len(train_index)
         self.participation_times = 0
         self.batch_size = batch_size
@@ -92,6 +92,7 @@ class FedAvgTrainer:
         self.timer.stop()
         self.current_client.training_time = self.timer.times[-1]
         self.current_client.participate_once()
+        # Due to wandb settings and workstation configuration, the training time (in seconds) is multiplied by 10 here.
         self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0)
         torch.cuda.empty_cache()
         return self.current_client

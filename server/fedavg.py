@@ -42,7 +42,7 @@ class FedAvgServer:
         self.args = args
         self.device = self.args['device']
         self.algorithm = args["algorithm"]
-        self.current_time = 0
+        self.current_time = 0 # Record the time taken for the global epoch
         with open(PROJECT_DIR / "data" / self.args["dataset"] / "args.json", "r") as f:
             self.args["dataset_args"] = json.load(f)
         if self.args["wandb"]:
@@ -72,56 +72,59 @@ class FedAvgServer:
         self.logger.log("=" * 20, "ALGORITHM:", self.algorithm, "=" * 20)
         formatted_args = json.dumps(self.args, indent=4)
         self.logger.log("Experiment Arguments:", formatted_args)
-        partition_path = PROJECT_DIR / "data" / self.args["dataset"] / "partition.pkl"
+        partition_path = PROJECT_DIR / "data" / self.args["dataset"] / "partition.pkl" # Dataset partition file. It records the data indices owned by each client.
         with open(partition_path, "rb") as f:
             partition = pickle.load(f)
-        self.train_client_ids: List[int] = partition["separation"]["train"]
-        self.client_num: int = partition["separation"]["total"]
+        self.train_client_ids: List[int] = partition["separation"]["train"] # The IDs of the clients participating in the training, usually ranging from 0 to client_num-1
+        self.client_num: int = partition["separation"]["total"] # The number of clients participating in the training
         self.client_sample_stream = [
             random.sample(
                 self.train_client_ids, max(1, int(self.client_num * self.args["client_join_ratio"]))
             )
             for _ in range(self.args["global_epoch"])
-        ]
-        self.current_selected_client_ids: List[int] = []
+        ] # Pre-generate the clients participating in each global epoch; randomly generated, with the number determined by client_join_ratio.
+        self.current_selected_client_ids: List[int] = [] # Record the clients participating in the current global epoch.
         self.client_to_server=queue.Queue()
         torch.cuda.set_device(self.device)
         self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
-        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes).to(self.device)
-        if self.args["model"] == 'vit':
+        self.model = MODEL_DICT[self.args["model"]](self.data_num_classes).to(self.device) # Create the model
+        if self.args["model"] == 'vit':  # ViT requires special configuration
             for name, param in self.model.named_parameters():
                 if 'head' in name or 'lora' in name or 'Prompt' in name:
                     param.requires_grad_(True)
                 else:
                     param.requires_grad_(False)
+
         self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
         self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=self.args['t_batch_size'],
                                      shuffle=False, pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
                                      persistent_workers=True, pin_memory_device=self.device,prefetch_factor = 8)
         self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "train")
+        # In the following steps, the dataset for each client is loaded by modifying the index queue in the sampler.
         self.train_sampler = CustomSampler(list(range(len(self.trainset))))
         self.trainloader = DataLoader(Subset(self.trainset, list(range(len(self.trainset)))), self.args["batch_size"],
                                       pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']], persistent_workers=True,
                                       sampler=self.train_sampler, pin_memory_device=self.device,prefetch_factor = 8)
-        self.accuracy = 0
+        
+        self.accuracy = 0 # The accuracy of the current latest model
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.args["lr"],
                                          momentum=self.args["momentum"], weight_decay=self.args["weight_decay"])
-        self.data_indices = partition["data_indices"]
-        self.client_instances: list[BaseClient] = []
-        for client_id in self.train_client_ids:
+        self.data_indices = partition["data_indices"]  # The indices of the entire dataset
+        self.client_instances: list[BaseClient] = [] 
+        for client_id in self.train_client_ids: # Create client instances
             self.client_instances.append(client_type(client_id, self.data_indices[client_id].tolist(), self.args["batch_size"], ))
         self.cuda_0_trainer = trainer_type(self.device, deepcopy(self.model), self.trainloader, self.testloader,
-                                           self.args)
+                                           self.args) # Create a Trainer instance
         self.logger.log(f"{self.device} has been initialized")
     
-    def train(self):
-        for E in range(self.args["global_epoch"]):
+    def train(self): 
+        for E in range(self.args["global_epoch"]): # Complete global_epochs training
             self.logger.log("-" * 30, f"[bold red]TRAINING EPOCH: {E + 1}[/bold red]", "-" * 30)
             self.current_selected_client_ids = self.client_sample_stream[E]
             self.logger.log(f"current selected clients: {self.current_selected_client_ids}")
             training_time = self.train_one_round( E + 1 )
             self.current_time += training_time
-            self.accuracy,loss = evaluate(torch.device(self.device), self.model, self.testloader)
+            self.accuracy,loss = evaluate(torch.device(self.device), self.model, self.testloader) # Test
             self.logger.log(f"Finished training!!! Current global epoch training time: {training_time}.",
                             f"The global time is {self.current_time}",
                             f"The Global model accuracy is {self.accuracy:.3f}%.")
@@ -131,36 +134,37 @@ class FedAvgServer:
             self.logger.log(f"Client{client_instance.client_id}'s training time : {client_instance.training_time_record}")
     
     def train_one_round(self,global_round):
-        client_model_cache = []
-        weight_cache = []
+        client_model_cache = [] # Store the model parameters of the clients participating in the training
+        weight_cache = [] # Store the weights of the clients participating in the training
         client_training_time = []
         trainer_synchronization = {"round":global_round}
         for client_id in self.current_selected_client_ids:
             assert self.client_instances[client_id].client_id == client_id
-            self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict())
-        for client_id in self.current_selected_client_ids:
+            self.client_instances[client_id].model_dict = deepcopy(self.model.state_dict()) # For each client participating in the training, perform a deepcopy of the global model.
+        for client_id in self.current_selected_client_ids: # Complete the local training for all clients participating in the training.
             modified_client_instance = self.cuda_0_trainer.start(
                 self.client_instances[client_id],
                 self.optimizer.state_dict(),
                 trainer_synchronization
-            )
+            ) # Complete the client's local training using the trainer
             assert modified_client_instance.client_id == client_id
             self.logger.log(
                 f"client {client_id} has finished and has participate {modified_client_instance.participation_times}. The local train set size is {modified_client_instance.train_set_len}. ",
                 f"The pretrained acc is {modified_client_instance.pretrained_accuracy:.3f}%. The local accuracy is {modified_client_instance.accuracy:.3f}%.",
-                f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}.")
+                # Due to wandb settings and workstation configuration, the training time (in seconds) is multiplied by 10 here.
+                f"The time is {modified_client_instance.training_time}. Scaled time is {round(modified_client_instance.training_time * 10.0)}.") 
             self.client_to_server.put(modified_client_instance)
         assert self.client_to_server.qsize() == len(self.current_selected_client_ids)
-        while not self.client_to_server.empty():
+        while not self.client_to_server.empty(): # Collect relevant information
             modified_client_instance = self.client_to_server.get()
             assert modified_client_instance.client_id in self.current_selected_client_ids
             client_model = {key: value for key, value in modified_client_instance.model_dict.items()}
-            del modified_client_instance.model_dict
+            del modified_client_instance.model_dict # Save GPU memory
             client_model_cache.append(client_model)
             weight_cache.append(modified_client_instance.train_set_len)
             client_training_time.append(round(modified_client_instance.training_time * 10.0))
             self.client_instances[modified_client_instance.client_id] = modified_client_instance
-        self.aggregate(client_model_cache, weight_cache)
+        self.aggregate(client_model_cache, weight_cache) # Aggregate the local models to obtain a new global model
         return max(client_training_time)
     
     def aggregate(
