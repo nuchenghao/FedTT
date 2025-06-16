@@ -1,3 +1,5 @@
+import torch
+import torch_musa
 import pickle
 import sys
 import json
@@ -8,7 +10,6 @@ from collections import OrderedDict
 from copy import deepcopy
 from typing import Dict, List
 import wandb
-import torch
 import yaml
 from rich.console import Console
 from collections import defaultdict
@@ -22,12 +23,12 @@ sys.path.append(PROJECT_DIR.joinpath("src").as_posix())
 from utls.utils import (
     TRAIN_LOG,
     Logger,
-    fix_random_seed,
+    fix_random_seed_musa,
     NN_state_load,
     get_argparser,
     evaluate
 )
-from client.fedavg import FedAvgTrainer, BaseClient
+from client.fedavg_musa import FedAvgTrainer, BaseClient
 from utls.models import MODEL_DICT
 from data.utils.datasets import DATA_NUM_CLASSES_DICT, DATASETS , DATASETS_COLLATE_FN
 from utls.dataset import CustomSampler
@@ -67,7 +68,7 @@ class FedAvgServer:
         self.logger = Logger(
             stdout=stdout,
             enable_log=self.args["save_log"],
-            logfile_path=TRAIN_LOG / self.algorithm / f"{dataset}_log.log",
+            logfile_path=TRAIN_LOG / self.algorithm / f"{dataset}_log_{self.args['batch_size']}.log",
         )
         self.logger.log("=" * 20, "ALGORITHM:", self.algorithm, "=" * 20)
         formatted_args = json.dumps(self.args, indent=4)
@@ -85,7 +86,7 @@ class FedAvgServer:
         ] # Pre-generate the clients participating in each global epoch; randomly generated, with the number determined by client_join_ratio.
         self.current_selected_client_ids: List[int] = [] # Record the clients participating in the current global epoch.
         self.client_to_server=queue.Queue()
-        torch.cuda.set_device(self.device)
+        # torch.cuda.set_device(self.device)
         self.data_num_classes = DATA_NUM_CLASSES_DICT[self.args['dataset']]
         self.model = MODEL_DICT[self.args["model"]](self.data_num_classes).to(self.device) # Create the model
         if self.args["model"] == 'vit':  # ViT requires special configuration
@@ -96,12 +97,10 @@ class FedAvgServer:
                     param.requires_grad_(False)
 
         self.testset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
-        # self.testset = DATASETS[self.args['dataset']]("/datasets/cinic10/", "test")
         self.testloader = DataLoader(Subset(self.testset, list(range(len(self.testset)))), batch_size=self.args['t_batch_size'],
                                      shuffle=False, pin_memory=True, num_workers=4,collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],
                                      persistent_workers=True, pin_memory_device=self.device,prefetch_factor = 8)
         self.trainset = DATASETS[self.args['dataset']](PROJECT_DIR / "data" / args["dataset"], "train")
-        # self.trainset = DATASETS[self.args['dataset']]("/datasets/cinic10/", "train")
         # In the following steps, the dataset for each client is loaded by modifying the index queue in the sampler.
         self.train_sampler = CustomSampler(list(range(len(self.trainset))))
         self.trainloader = DataLoader(Subset(self.trainset, list(range(len(self.trainset)))), self.args["batch_size"],
@@ -192,6 +191,6 @@ if __name__ == "__main__":
     with open(parser.config_path, 'r') as file:
         args = yaml.safe_load(file)
     if args["set_seed"]:
-        fix_random_seed(args["seed"])
+        fix_random_seed_musa(args["seed"])
     server = FedAvgServer(args=args)
     server.train()

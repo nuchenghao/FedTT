@@ -85,8 +85,9 @@
 
 
 
-
-
+# usability for mthreads
+# python3 -u ./server/fedavg_musa.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_musa.yaml
+# python3 -u ./server/FedTT_musa.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/FedTT_musa.yaml
 
 
 
@@ -439,6 +440,7 @@
 # python3 -u ./centralized/resnet50_cifar100.py --config_path ./config/resnet50_cifar100/dir_3_seed_16_client_30/centralized.yaml
 
 # python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_3_seed_16_client_30/data.yaml
+# python3 -u ./data/generate_data.py --config_path ./config/resnet50_cifar100/dir_3_seed_16_client_30/data_musa.yaml
 
 # python3 -u ./server/fedavg.py --config_path ./config/resnet50_cifar100/dir_3_seed_16_client_30/fedavg_96.yaml
 
@@ -512,6 +514,15 @@
 # python3 -u ./server/fednova.py --config_path ./config/resnet50_cifar100/dir_3_seed_16_client_30/fednova_FedTT.yaml
 
 # python3 -u ./server/FedTT.py --config_path ./config/resnet50_cifar100/dir_3_seed_16_client_30/FedTT_loss_r3.yaml
+
+
+
+
+
+
+# usability for mthreads
+# python3 -u ./server/fedavg_musa.py --config_path ./config/resnet50_cifar100/dir_3_seed_16_client_30/fedavg_musa.yaml
+# python3 -u ./server/FedTT_musa.py --config_path ./config/resnet50_cifar100/dir_3_seed_16_client_30/FedTT_musa.yaml
 
 
 

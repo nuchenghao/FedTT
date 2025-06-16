@@ -1,10 +1,10 @@
-algorithm: FedTT
+algorithm: FedTT_staleness
 dataset: cifar100 
 model: resnet50 
 
 
 set_seed: True 
-seed: 16 
+seed: 166 
 
 client_num: 30 
 
@@ -24,8 +24,8 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 
 # wandb setting
 wandb: 0 # wandb: 1 record, 0 not
-project: cifar100_16
-experiment_name: FedTT_r3_96
+project: cifar100_166
+experiment_name: FedTT_staleness
 
 
 r: 0.3 # retention rate

@@ -56,3 +56,10 @@ Download these six [sub-datasets](https://ai.bu.edu/M3SDA/) to the `FedTT/data/d
 ## Testbed experiments
 + All testbed experiment startup commands are stored in `start_on_device.sh`
 + You need to change the server IP address and port in the algorithm configuration file under the `FedTT/on_device/config` directory.
+
+## Cross-Platform Portability
+
++ Hardware: MTT S4000 (48 GB) with a Xeon Gold 6430 CPU and 100 GB DDR4 memory.
++ Software: Ubuntu 22.04 with Python 3.10 and PyTorch 2.2.0; the MUSA version is 3.1.0.
+
+code in ./server/fedavg_musa.py and ./server/FedTT_musa.py

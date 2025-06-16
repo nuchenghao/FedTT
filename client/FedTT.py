@@ -42,6 +42,7 @@ class FedTTClient(FedAvgTrainer):
             "FedTT_wo_pst":self.FedTT_wo_pst,
             "IBRS": self.IBRS,
             "FedTT_loss": self.FedTT_loss,
+            "FedTT_staleness": self.FedTT_staleness
         }
         nvml.nvmlInit()
         self.handle = nvml.nvmlDeviceGetHandleByIndex(0) 
@@ -480,9 +481,49 @@ class FedTTClient(FedAvgTrainer):
                 loss.backward()
                 self.optimizer.step()
         torch.cuda.synchronize()
+    
+
+    def select_indices(self,classify, r):
+        classify = np.array(classify)  
+        idx_1 = np.where(classify == 1)[0]  
+        idx_0 = np.where(classify == 0)[0]  
+
         
+        num_select_1 = math.ceil(r * len(idx_1))
+        selected_idx_1 = np.random.choice(idx_1, size=num_select_1, replace=False)
+        self.trainloader.dataset.reset_weight(self.trainloader.dataset.cur_batch_index[selected_idx_1],1/r)
+        
+        selected_idx_0 = idx_0
+        self.trainloader.dataset.reset_weight(self.trainloader.dataset.cur_batch_index[selected_idx_0],1.0)
+        
+        selected_indices = np.sort(np.concatenate([selected_idx_1, selected_idx_0]))
+
+        return selected_indices
+
+    def FedTT_staleness(self):
+        self.model.train()
+        for _ in range(self.local_epoch):
+            for inputs, targets in self.trainloader:
+                if isinstance(inputs,torch.Tensor):
+                    inputs = inputs.to(self.device, non_blocking=True)
+                else:
+                    inputs = [tensor.to(self.device, non_blocking=True) for tensor in inputs]
+                targets = targets.to(self.device,non_blocking=True)
+                classify = self.trainloader.dataset.get_value(self.trainloader.dataset.cur_batch_index)
+                selected_indices = self.select_indices(classify,self.args['r'])
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs[selected_indices])
+                _, predicted = outputs.max(1)
+                value = targets[selected_indices] == predicted
+                loss = self.criterion(outputs, targets[selected_indices])
+                self.trainloader.dataset.cur_batch_index = self.trainloader.dataset.cur_batch_index[selected_indices]
+                loss = self.trainloader.dataset.update(loss,value.float(),self.device)
+                loss.backward()
+                self.optimizer.step()
+        torch.cuda.synchronize()
+
     def local_train(self):
-        if (self.args["algorithm"] == "FedTT_wo_pst" and self.current_client.participation_times > 0) or self.args["algorithm"] == "IBRS":
+        if (self.args["algorithm"] == "FedTT_wo_pst" and self.current_client.participation_times > 0) or self.args["algorithm"] == "IBRS" or self.args["algorithm"] == "FedTT_staleness":
             self.func[self.args["algorithm"]]()
         elif self.synchronization['prune'] and self.current_client.participation_times > 0:
             self.func[self.args["algorithm"]]()

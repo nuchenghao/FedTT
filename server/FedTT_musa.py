@@ -2,9 +2,9 @@ from copy import deepcopy
 from pathlib import Path
 import sys
 import yaml
-from fedavg import FedAvgServer
-from utls.utils import get_argparser, fix_random_seed
-from client.FedTT import FedTTClient
+from fedavg_musa import FedAvgServer
+from utls.utils import get_argparser, fix_random_seed_musa
+from client.FedTT_musa import FedTTClient
 from rich.console import Console
 import os
 from utls.dataset import NeedIndexDataset
@@ -15,17 +15,11 @@ PROJECT_DIR = Path(__file__).parent.parent.absolute()
 sys.path.append(PROJECT_DIR.as_posix())
 sys.path.append(PROJECT_DIR.joinpath("src").as_posix())
 
+
 class FedTTServer(FedAvgServer):
     def __init__(self, args):
         super().__init__(args=args, trainer_type=FedTTClient)
         self.current_global_epoch = 0
-        if self.args['algorithm'] == "FedTT_staleness":
-            self.trainset = NeedIndexDataset(self.trainset)
-            self.train_sampler = self.trainset.sampler
-            self.trainloader = DataLoader(self.trainset, batch_size=self.args["batch_size"],shuffle = False,
-                                      pin_memory=True, num_workers=4, collate_fn = DATASETS_COLLATE_FN[self.args['dataset']],persistent_workers=True,
-                                      sampler=self.train_sampler, pin_memory_device=self.device,prefetch_factor = 8)
-            self.cuda_0_trainer.trainloader = self.trainloader
 
     def train_one_round(self,global_round):
         client_model_cache = []
@@ -67,6 +61,6 @@ if __name__ == '__main__':
     with open(parser.config_path, 'r') as file:
         args = yaml.safe_load(file)
     if args["set_seed"]:
-        fix_random_seed(args["seed"])
+        fix_random_seed_musa(args["seed"])
     server = FedTTServer(args=args)
     server.train()

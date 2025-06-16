@@ -3,12 +3,12 @@ dataset: cifar100
 model: resnet50 
 
 
-set_seed: True 
-seed: 16 
+set_seed: False 
+seed: 166 
 
 client_num: 30 
 
-batch_size: 96 # trainloader batch size
+batch_size: 256 # trainloader batch size
 t_batch_size: 2048 # testloader batch size
 
 client_join_ratio: 0.3 #Ratio for (client each round) / (client num in total).
@@ -24,13 +24,13 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 
 # wandb setting
 wandb: 0 # wandb: 1 record, 0 not
-project: cifar100_16
+project: cifar100_16_mthread
 experiment_name: FedTT_r3_96
 
 
-r: 0.3 # retention rate
+r: 0.4 # retention rate
 max_gpu_memory_GB: 22
 
 client_eval: False # Whether to perform testing on the client side.
 save_log: 1 # Non-zero value for saving algorithm running log
-device: "cuda:1"
+device: "musa"
