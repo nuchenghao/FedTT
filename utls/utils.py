@@ -1,3 +1,5 @@
+import torch
+import torch_musa
 import os
 import random
 from copy import deepcopy
@@ -40,6 +42,21 @@ def fix_random_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+def fix_random_seed_musa(seed: int) -> None:
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.random.manual_seed(seed)
+    torch_musa.manual_seed(seed)
+    torch_musa.manual_seed_all(seed)
+    if torch_musa.is_available():
+        torch_musa.empty_cache()
+        torch_musa.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 def NN_state_load(
         src,
         detach=False,
