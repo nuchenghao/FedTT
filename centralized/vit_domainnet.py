@@ -47,11 +47,11 @@ if __name__=='__main__':
                          pin_memory=True,
                          num_workers=8,
                          persistent_workers=True,
-                         pin_memory_device='cuda:0')
+                         pin_memory_device=args["device"])
     testset=DATASETS[args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
     testloader = DataLoader(testset, batch_size=512, shuffle=False, pin_memory=True, num_workers=8,
-                        persistent_workers=True, pin_memory_device='cuda:0')
-    model = MODEL_DICT[args["model"]](DATA_NUM_CLASSES_DICT[args['dataset']]).to('cuda:0')
+                        persistent_workers=True, pin_memory_device=args["device"])
+    model = MODEL_DICT[args["model"]](DATA_NUM_CLASSES_DICT[args['dataset']]).to(args["device"])
     for name, param in model.named_parameters():
         if 'head' in name or 'lora' in name or 'Prompt' in name:
             param.requires_grad_(True)
@@ -59,14 +59,14 @@ if __name__=='__main__':
             param.requires_grad_(False)
     optimizer = torch.optim.SGD(model.parameters(), lr=args["lr"],
                                          momentum=args["momentum"], weight_decay=args["weight_decay"])
-    criterion = nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to('cuda:0')
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none').to(args["device"])
     def test(epoch):
         model.eval()
         correct = 0
         total = 0
         with torch.no_grad():
             for batch_idx, (inputs, targets) in enumerate(testloader):
-                inputs, targets = inputs.to('cuda:0'), targets.to("cuda:0")
+                inputs, targets = inputs.to(args["device"]), targets.to(args["device"])
                 outputs = model(inputs)
                 _, predicted = outputs.max(1)
                 total += targets.size(0)
@@ -79,7 +79,7 @@ if __name__=='__main__':
         model.train()
         timer.start()
         for batch_idx, (inputs, targets) in enumerate(trainloader):
-            inputs, targets = inputs.to('cuda'), targets.to('cuda')
+            inputs, targets = inputs.to(args["device"]), targets.to(args["device"])
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = torch.mean(criterion(outputs, targets))
@@ -88,4 +88,5 @@ if __name__=='__main__':
         torch.cuda.synchronize()
         timer.stop()
         acc=test(epoch)
-        experiment.log({"acc": acc}, step=int(timer.sum()))
+        if args["wandb"]:
+            experiment.log({"acc": acc}, step=int(timer.sum()))

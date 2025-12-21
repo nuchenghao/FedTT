@@ -22,7 +22,7 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 
 
 # wandb record
-wandb: 1 # wandb: 1 record, 0 not
+wandb: 0 # wandb: 1 record, 0 not
 project: domainnet_16
 experiment_name: fedavg
 

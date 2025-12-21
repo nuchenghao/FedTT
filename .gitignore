@@ -1,9 +1,4 @@
 *.pyc
 WANDB_LOG_DIR/
 trainlog/
-data/cifar100
-data/cinic10
-data/femnist/data
-data/snli
-data/__MACOSX
-data/domainnet
+data/

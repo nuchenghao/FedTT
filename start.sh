@@ -93,6 +93,20 @@
 
 
 
+
+# 第二个工作
+python3 -u ./data/generate_data.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/data_30.yaml
+python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_30_00.yaml
+python3 -u ./server/FedTT.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/FedTT_r3_128_30_00.yaml
+
+python3 -u ./data/generate_data.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/data_50.yaml
+python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_50_00.yaml
+python3 -u ./server/FedTT.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/FedTT_r3_128_50_00.yaml
+python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_50_13.yaml
+python3 -u ./server/fedavg.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/fedavg_50_35.yaml
+python3 -u ./server/FedTT.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/FedTT_r3_128_50_13.yaml
+python3 -u ./server/FedTT.py --config_path ./config/resnet34_cinic10/dir_3_seed_16_client_100/FedTT_r3_128_50_35.yaml
+
 # # ------------------ seed 166 ---------------------------
 
 # baselines:

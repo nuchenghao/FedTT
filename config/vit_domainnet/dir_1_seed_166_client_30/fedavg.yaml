@@ -22,10 +22,10 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 
 
 # wandb record
-wandb: 1 # wandb: 1 record, 0 not
+wandb: 0 # wandb: 1 record, 0 not
 project: domainnet_166
 experiment_name: fedavg
 
 client_eval: False # Whether to perform testing on the client side.
 save_log: 1 # Non-zero value for saving algorithm running log 
-device: "cuda:0"
+device: "cuda:1"

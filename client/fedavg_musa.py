@@ -1,5 +1,5 @@
 import torch
-import torch_musa
+# import torch_musa
 import json
 import pickle
 import random
@@ -96,7 +96,7 @@ class FedAvgTrainer:
         self.current_client.participate_once()
         # Due to wandb settings and workstation configuration, the training time (in seconds) is multiplied by 10 here.
         self.current_client.training_time_record[self.synchronization['round']] = round(self.current_client.training_time * 10.0)
-        torch_musa.empty_cache()
+        # torch_musa.empty_cache()
         return self.current_client
     
     def full_set(self):
@@ -113,7 +113,7 @@ class FedAvgTrainer:
                 loss = self._criterion(outputs, targets).mean()
                 loss.backward()
                 self.optimizer.step()
-        torch_musa.synchronize()
+        # torch_musa.synchronize()
         
     def local_train(self):
         self.full_set()

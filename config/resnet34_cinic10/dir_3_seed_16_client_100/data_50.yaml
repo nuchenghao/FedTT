@@ -1,7 +1,7 @@
 dataset: cinic10
 seed: 16
 
-client_num: 30
+client_num: 50
 
 
 iid: 0 # 0: non-iid, others: iid

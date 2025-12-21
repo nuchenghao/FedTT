@@ -7,7 +7,7 @@ set_seed: True
 seed: 166
 
 
-global_epoch: 10
+global_epoch: 100
 batch_size: 64 # trainloader batch size
 t_batch_size: 512 # testloader batch size
 
@@ -18,7 +18,7 @@ weight_decay: 0.0 # Weight decay for client local optimizer.
 
 
 # wandb record
-wandb: 1 # wandb: 1 record, 0 not
+wandb: 0 # wandb: 1 record, 0 not
 project: domainnet_166
 experiment_name: centralized training
-device: "cuda:0"
+device: "cuda:1"

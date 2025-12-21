@@ -11,7 +11,7 @@ t_batch_size: 2048 # testloader batch size
 global_epoch: 100
 
 # wandb setting
-wandb: 1 # wandb: 1 record, 0 not
+wandb: 0 # wandb: 1 record, 0 not
 project: cinic10_16
 experiment_name: centralized training
 

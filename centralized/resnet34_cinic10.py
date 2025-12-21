@@ -43,16 +43,16 @@ if __name__=='__main__':
         experiment.name = args["experiment_name"]
         experiment.log({"acc": 0.0}, step=0)
         wandb.run.save()
-    trainset=DATASETS[args['dataset']](PROJECT_DIR / "data" / args["dataset"], "train")
+    trainset=DATASETS[args['dataset']]("/datasets/cinic10", "train")
     trainloader = DataLoader(trainset,
                          batch_size=args["batch_size"],
                          shuffle=True,
                          pin_memory=True,
-                         num_workers=8,
+                         num_workers=1,
                          persistent_workers=True,
                          pin_memory_device='cuda:0')
     testset=DATASETS[args['dataset']](PROJECT_DIR / "data" / args["dataset"], "test")
-    testloader = DataLoader(testset, batch_size=2048, shuffle=False, pin_memory=True, num_workers=8,
+    testloader = DataLoader(testset, batch_size=512, shuffle=False, pin_memory=True, num_workers=4,
                         persistent_workers=True, pin_memory_device='cuda:0')
     model = MODEL_DICT[args["model"]](DATA_NUM_CLASSES_DICT[args['dataset']]).to('cuda:0')
     optimizer = torch.optim.SGD(model.parameters(), lr=args["lr"],

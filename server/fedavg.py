@@ -125,7 +125,7 @@ class FedAvgServer:
             self.logger.log("-" * 30, f"[bold red]TRAINING EPOCH: {E + 1}[/bold red]", "-" * 30)
             self.current_selected_client_ids = self.client_sample_stream[E]
             self.logger.log(f"current selected clients: {self.current_selected_client_ids}")
-            training_time = self.train_one_round( E + 1 )
+            training_time = self.train_one_round( E + 1 ) + random.randint(self.args["start"],self.args["end"])
             self.current_time += training_time
             self.accuracy,loss = evaluate(torch.device(self.device), self.model, self.testloader) # Test
             self.logger.log(f"Finished training!!! Current global epoch training time: {training_time}.",
